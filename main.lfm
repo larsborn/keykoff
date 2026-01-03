@@ -1,0 +1,131 @@
+object fMain: TfMain
+  Left = 345
+  Height = 350
+  Top = 224
+  Width = 547
+  Caption = 'Quick Launcher'
+  ClientHeight = 350
+  ClientWidth = 547
+  DesignTimePPI = 120
+  LCLVersion = '4.4.0.0'
+  OnCreate = FormCreate
+  object lbCommands: TListBox
+    Left = 0
+    Height = 350
+    Top = 0
+    Width = 125
+    Align = alLeft
+    ItemHeight = 0
+    PopupMenu = pmList
+    TabOrder = 0
+    OnSelectionChange = lbCommandsSelectionChange
+  end
+  object gbCommand: TGroupBox
+    Left = 128
+    Height = 328
+    Top = 8
+    Width = 408
+    Caption = 'Command'
+    ClientHeight = 303
+    ClientWidth = 404
+    TabOrder = 1
+    object edtCommand: TEdit
+      Left = 8
+      Height = 28
+      Top = 88
+      Width = 384
+      TabOrder = 1
+      Text = 'C:\Windows\System32\cmd.exe'
+    end
+    object Label1: TLabel
+      Left = 8
+      Height = 20
+      Top = 64
+      Width = 75
+      Caption = 'Executable:'
+    end
+    object edtParameters: TEdit
+      Left = 8
+      Height = 28
+      Top = 144
+      Width = 384
+      TabOrder = 2
+      Text = '/K dir'
+    end
+    object Label2: TLabel
+      Left = 8
+      Height = 20
+      Top = 120
+      Width = 76
+      Caption = 'Parameters:'
+    end
+    object edtDirectory: TEdit
+      Left = 8
+      Height = 28
+      Top = 200
+      Width = 384
+      TabOrder = 3
+      Text = 'C:'
+    end
+    object Label3: TLabel
+      Left = 8
+      Height = 20
+      Top = 176
+      Width = 64
+      Caption = 'Directory:'
+    end
+    object edtName: TEdit
+      Left = 8
+      Height = 28
+      Top = 32
+      Width = 384
+      TabOrder = 0
+      Text = 'calc'
+    end
+    object Label4: TLabel
+      Left = 8
+      Height = 20
+      Top = 8
+      Width = 43
+      Caption = 'Name:'
+    end
+    object btnSave: TButton
+      Left = 298
+      Height = 31
+      Top = 256
+      Width = 94
+      Caption = 'Save'
+      TabOrder = 4
+      OnClick = btnSaveClick
+    end
+    object btnTest: TButton
+      Left = 8
+      Height = 31
+      Top = 256
+      Width = 94
+      Caption = 'Test / Run'
+      TabOrder = 5
+      OnClick = btnTestClick
+    end
+  end
+  object pmList: TPopupMenu
+    Left = 32
+    Top = 16
+    object miNew: TMenuItem
+      Caption = 'New...'
+      OnClick = miNewClick
+    end
+    object miDelete: TMenuItem
+      Caption = 'Delete'
+      OnClick = miDeleteClick
+    end
+  end
+  object SelectDirectoryDialog1: TSelectDirectoryDialog
+    Left = 464
+    Top = 208
+  end
+  object OpenDialog1: TOpenDialog
+    Left = 464
+    Top = 96
+  end
+end
