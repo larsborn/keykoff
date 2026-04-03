@@ -19,11 +19,19 @@ If your input doesn't match any command, pressing Enter opens a dialog to create
 
 ## Getting started
 
-1. `cargo build --release`
-2. Run `target/release/keykoff.exe`
+1. Download `keykoff.exe` from the [latest release](../../releases/latest)
+2. Run it -- a tray icon appears (no window)
 3. Press **ALT+F10** to open the overlay
 4. Type a name that doesn't exist yet and press Enter to create your first command
 5. Fill in the executable path (and optionally caption, parameters, working directory) and save
+
+### Building from source
+
+```bash
+cargo build --release
+```
+
+The binary will be at `target/release/keykoff.exe`.
 
 ## Configuration
 
