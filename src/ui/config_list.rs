@@ -1,8 +1,13 @@
 use eframe::egui;
+use winreg::enums::*;
+use winreg::RegKey;
 
 use crate::app::{AppMode, ConfigTab, KeykoffApp};
 use crate::config;
 use crate::hotkey;
+
+const AUTOSTART_REG_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+const AUTOSTART_VALUE_NAME: &str = "keykoff";
 
 enum ListAction {
     Edit(usize),
@@ -15,6 +20,7 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
             ui.selectable_value(&mut app.config_tab, ConfigTab::Commands, "Commands");
             ui.selectable_value(&mut app.config_tab, ConfigTab::Positioning, "Positioning");
             ui.selectable_value(&mut app.config_tab, ConfigTab::Hotkey, "Hotkey");
+            ui.selectable_value(&mut app.config_tab, ConfigTab::Autostart, "Autostart");
         });
         ui.separator();
 
@@ -22,6 +28,7 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
             ConfigTab::Commands => show_commands_tab(app, ui),
             ConfigTab::Positioning => show_positioning_tab(app, ui),
             ConfigTab::Hotkey => show_hotkey_tab(app, ui),
+            ConfigTab::Autostart => show_autostart_tab(ui),
         }
     });
 
@@ -203,4 +210,45 @@ fn show_hotkey_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
         "ALT"
     };
     ui.label(format!("Current hotkey: {}+{}", mods, app.config.hotkey_key));
+}
+
+fn is_autostart_enabled() -> bool {
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let Ok(run_key) = hkcu.open_subkey(AUTOSTART_REG_KEY) else {
+        return false;
+    };
+    run_key.get_value::<String, _>(AUTOSTART_VALUE_NAME).is_ok()
+}
+
+fn set_autostart(enabled: bool) -> Result<(), String> {
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let run_key = hkcu
+        .open_subkey_with_flags(AUTOSTART_REG_KEY, KEY_SET_VALUE)
+        .map_err(|e| format!("Failed to open registry key: {}", e))?;
+
+    if enabled {
+        let exe_path = std::env::current_exe()
+            .map_err(|e| format!("Failed to get executable path: {}", e))?;
+        run_key
+            .set_value(AUTOSTART_VALUE_NAME, &exe_path.to_string_lossy().as_ref())
+            .map_err(|e| format!("Failed to set registry value: {}", e))?;
+    } else {
+        run_key
+            .delete_value(AUTOSTART_VALUE_NAME)
+            .map_err(|e| format!("Failed to remove registry value: {}", e))?;
+    }
+    Ok(())
+}
+
+fn show_autostart_tab(ui: &mut egui::Ui) {
+    ui.add_space(10.0);
+    ui.label("Start keykoff automatically when Windows starts.");
+    ui.add_space(10.0);
+
+    let mut enabled = is_autostart_enabled();
+    if ui.checkbox(&mut enabled, "Start with Windows").changed() {
+        if let Err(e) = set_autostart(enabled) {
+            eprintln!("Autostart error: {}", e);
+        }
+    }
 }

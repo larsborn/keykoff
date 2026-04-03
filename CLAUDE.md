@@ -26,6 +26,7 @@ Release builds hide the console window via `#![windows_subsystem = "windows"]`.
 | serde / serde_json | 1 | Config serialization |
 | dirs | 6 | `%APPDATA%` path resolution |
 | rfd | 0.15 | Native file/folder picker dialogs |
+| winreg | 0.55 | Windows registry access (autostart) |
 
 ## Architecture
 
@@ -34,7 +35,7 @@ Single eframe window with mode-based UI switching:
 - **Idle** — window parked off-screen (1x1 at -10000,-10000), tray icon + hotkey active
 - **Input** — borderless always-on-top overlay at user-configured position, typeahead dropdown with numbered results (1-9)
 - **NewConfig / EditConfig** — dialog with name/caption/exe/params/workdir fields; Enter in any field saves; Name field auto-focused on open
-- **ConfigList** — tabbed settings window (Commands, Positioning, Hotkey)
+- **ConfigList** — tabbed settings window (Commands, Positioning, Hotkey, Autostart)
 
 Mode transitions reconfigure window properties (size, position, decorations) via `ViewportCommand`.
 
@@ -84,7 +85,7 @@ src/
     mod.rs             # Re-exports
     input_overlay.rs   # Typeahead search overlay with numbered results (1-9)
     config_dialog.rs   # New/edit configuration form (name, caption, exe, params, workdir)
-    config_list.rs     # Tabbed settings: Commands list, Positioning tab, Hotkey tab
+    config_list.rs     # Tabbed settings: Commands list, Positioning tab, Hotkey tab, Autostart tab
 ```
 
 ## Data

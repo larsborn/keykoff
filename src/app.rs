@@ -24,6 +24,7 @@ pub enum ConfigTab {
     Commands,
     Positioning,
     Hotkey,
+    Autostart,
 }
 
 impl Default for ConfigTab {
@@ -185,7 +186,7 @@ impl KeykoffApp {
         let entry = RunConfig {
             name: self.dialog_name.trim().to_string(),
             caption: self.dialog_caption.trim().to_string(),
-            executable: self.dialog_executable.trim().to_string(),
+            executable: self.dialog_executable.trim().trim_matches('"').to_string(),
             parameters: self.dialog_parameters.trim().to_string(),
             working_directory: self.dialog_working_directory.trim().to_string(),
         };
