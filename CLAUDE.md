@@ -144,6 +144,10 @@ The Hotkey tab in ConfigList allows changing the key (F1-F12) and modifiers (ALT
 
 In the Commands tab of ConfigList, each row uses a right-to-left outer layout so Edit/Delete buttons are always visible (allocated first). The remaining space shows the command name (fixed-width column sized to the widest name) and executable path (truncated via `Label::truncate()`).
 
+## Changelog
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). When preparing a new release, update the changelog based on the git diff and commit messages since the last release. Group changes under Added, Changed, Deprecated, Removed, Fixed, or Security headings as appropriate.
+
 ## Conventions
 
 - Rust 2021 edition
