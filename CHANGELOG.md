@@ -4,6 +4,16 @@ All notable changes to keykoff will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.1] - 2026-04-11
+
+### Added
+
+- Autostart tab in settings to register/unregister keykoff in the Windows startup registry key
+
+### Fixed
+
+- Autostart now resolves subst drives and junctions to real filesystem paths so the executable can be found after reboot
+
 ## [1.0.0] - 2026-04-03
 
 Initial release. Rewritten from Pascal to Rust.
