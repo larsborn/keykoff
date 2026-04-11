@@ -229,8 +229,14 @@ fn set_autostart(enabled: bool) -> Result<(), String> {
     if enabled {
         let exe_path = std::env::current_exe()
             .map_err(|e| format!("Failed to get executable path: {}", e))?;
+        // Canonicalize to resolve subst drives and junctions to real paths
+        // (subst mappings don't persist across reboots)
+        let exe_path = std::fs::canonicalize(&exe_path).unwrap_or(exe_path);
+        let exe_str = exe_path.to_string_lossy();
+        // Strip \\?\ extended-length prefix added by canonicalize
+        let exe_str = exe_str.strip_prefix(r"\\?\").unwrap_or(&exe_str);
         run_key
-            .set_value(AUTOSTART_VALUE_NAME, &exe_path.to_string_lossy().as_ref())
+            .set_value(AUTOSTART_VALUE_NAME, &exe_str)
             .map_err(|e| format!("Failed to set registry value: {}", e))?;
     } else {
         run_key
