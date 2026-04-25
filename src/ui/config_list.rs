@@ -54,12 +54,24 @@ fn show_commands_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
         .config
         .entries
         .iter()
-        .map(|e| ui.fonts(|f| f.layout_no_wrap(e.name.clone(), egui::FontId::proportional(14.0), egui::Color32::WHITE).size().x))
+        .map(|e| ui.fonts(|f| f.layout_no_wrap(crate::config::entry_name(e).to_string(), egui::FontId::proportional(14.0), egui::Color32::WHITE).size().x))
         .fold(0.0_f32, f32::max)
         + 8.0; // small padding
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         for (i, entry) in app.config.entries.iter().enumerate() {
+            let (name, summary): (&str, String) = match entry {
+                crate::config::Entry::Program(p) => (p.name.as_str(), format!("-> {}", p.executable)),
+                crate::config::Entry::Group(g) => {
+                    let summary = if g.members.is_empty() {
+                        "-> (empty)".to_string()
+                    } else {
+                        format!("-> {} member{}", g.members.len(), if g.members.len() == 1 { "" } else { "s" })
+                    };
+                    (g.name.as_str(), summary)
+                }
+            };
+
             ui.horizontal(|ui| {
                 // Right-to-left: buttons get space first, text fills the rest
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -73,12 +85,9 @@ fn show_commands_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         ui.add_sized(
                             [max_name_width, ui.spacing().interact_size.y],
-                            egui::Label::new(egui::RichText::new(&entry.name).strong()),
+                            egui::Label::new(egui::RichText::new(name).strong()),
                         );
-                        ui.add(
-                            egui::Label::new(format!("-> {}", &entry.executable))
-                                .truncate(),
-                        );
+                        ui.add(egui::Label::new(summary).truncate());
                     });
                 });
             });
@@ -96,10 +105,16 @@ fn show_commands_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
             app.clear_dialog_fields();
             app.set_mode(AppMode::NewConfig);
         }
-        Some(ListAction::Edit(i)) => {
-            app.populate_dialog_from_entry(i);
-            app.set_mode(AppMode::EditConfig { index: i });
-        }
+        Some(ListAction::Edit(i)) => match app.config.entries.get(i) {
+            Some(crate::config::Entry::Program(_)) => {
+                app.populate_program_dialog_from_index(i);
+                app.set_mode(AppMode::EditConfig { index: i });
+            }
+            Some(crate::config::Entry::Group(_)) => {
+                // Wired in Task 10/11.
+            }
+            None => {}
+        },
         Some(ListAction::Delete(i)) => {
             app.config.entries.remove(i);
             let _ = config::save_config(&app.config);

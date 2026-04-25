@@ -15,9 +15,11 @@ const NUMBER_KEYS: [egui::Key; 9] = [
 ];
 
 fn open_edit(app: &mut KeykoffApp, config_idx: usize) {
-    app.populate_dialog_from_entry(config_idx);
-    app.dialog_return_to_idle = true;
-    app.set_mode(AppMode::EditConfig { index: config_idx });
+    if matches!(app.config.entries.get(config_idx), Some(crate::config::Entry::Program(_))) {
+        app.populate_program_dialog_from_index(config_idx);
+        app.dialog_return_to_idle = true;
+        app.set_mode(AppMode::EditConfig { index: config_idx });
+    }
 }
 
 pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
@@ -50,11 +52,14 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
         let font = egui::FontId::proportional(14.0);
         let mut max_w = 0.0_f32;
         for (display_idx, &config_idx) in app.filtered_indices.iter().enumerate().take(9) {
-            let entry = &app.config.entries[config_idx];
-            let text = if entry.caption.is_empty() {
-                format!("{}  {}", display_idx + 1, &entry.name)
+            let (name, caption): (&str, &str) = match &app.config.entries[config_idx] {
+                crate::config::Entry::Program(p) => (p.name.as_str(), p.caption.as_str()),
+                crate::config::Entry::Group(g) => (g.name.as_str(), g.caption.as_str()),
+            };
+            let text = if caption.is_empty() {
+                format!("{}  {}", display_idx + 1, name)
             } else {
-                format!("{}  {} - {}", display_idx + 1, &entry.name, &entry.caption)
+                format!("{}  {} - {}", display_idx + 1, name, caption)
             };
             let w = f.layout_no_wrap(text, font.clone(), egui::Color32::WHITE).size().x;
             max_w = max_w.max(w);
@@ -90,12 +95,15 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
             for (display_idx, &config_idx) in
                 app.filtered_indices.iter().enumerate().take(9)
             {
-                let entry = &app.config.entries[config_idx];
+                let (name, caption): (&str, &str) = match &app.config.entries[config_idx] {
+                    crate::config::Entry::Program(p) => (p.name.as_str(), p.caption.as_str()),
+                    crate::config::Entry::Group(g) => (g.name.as_str(), g.caption.as_str()),
+                };
                 let is_selected = display_idx == app.selected_index;
-                let text = if entry.caption.is_empty() {
-                    format!("{}  {}", display_idx + 1, &entry.name)
+                let text = if caption.is_empty() {
+                    format!("{}  {}", display_idx + 1, name)
                 } else {
-                    format!("{}  {} - {}", display_idx + 1, &entry.name, &entry.caption)
+                    format!("{}  {} - {}", display_idx + 1, name, caption)
                 };
                 let label = egui::SelectableLabel::new(is_selected, text);
                 let resp = ui.add(label);

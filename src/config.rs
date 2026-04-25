@@ -55,7 +55,7 @@ impl<'de> serde::Deserialize<'de> for Entry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    pub entries: Vec<RunConfig>,
+    pub entries: Vec<Entry>,
     #[serde(default = "default_overlay_x")]
     pub overlay_x: f32,
     #[serde(default = "default_overlay_y")]

@@ -6,7 +6,7 @@ use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use tray_icon::menu::MenuEvent;
 use tray_icon::TrayIcon;
 
-use crate::config::{self, AppConfig, RunConfig};
+use crate::config::{self, AppConfig, Entry, RunConfig};
 use crate::tray::TrayState;
 use crate::ui;
 
@@ -133,7 +133,7 @@ impl KeykoffApp {
                 .entries
                 .iter()
                 .enumerate()
-                .filter(|(_, entry)| entry.name.to_lowercase().contains(&query))
+                .filter(|(_, e)| crate::config::entry_name(e).to_lowercase().contains(&query))
                 .map(|(i, _)| i)
                 .collect();
         }
@@ -143,25 +143,51 @@ impl KeykoffApp {
     }
 
     pub fn do_launch(&mut self, config_index: usize) {
-        let entry = &self.config.entries[config_index];
-        if let Err(e) = crate::launcher::launch(entry) {
-            self.populate_dialog_from_entry(config_index);
-            self.dialog_error = Some(e);
-            self.dialog_return_to_idle = true;
-            self.set_mode(AppMode::EditConfig { index: config_index });
-        } else {
-            self.set_mode(AppMode::Idle);
+        use crate::config::{flatten_group_to_programs, Entry};
+        match self.config.entries.get(config_index) {
+            Some(Entry::Program(_)) => {
+                // Clone the program so we can subsequently call &mut self methods
+                // (e.g. populate_program_dialog_from_index) without a borrow conflict.
+                let program = if let Some(Entry::Program(p)) = self.config.entries.get(config_index) {
+                    p.clone()
+                } else {
+                    return;
+                };
+                if let Err(e) = crate::launcher::launch(&program) {
+                    self.populate_program_dialog_from_index(config_index);
+                    self.dialog_error = Some(e);
+                    self.dialog_return_to_idle = true;
+                    self.set_mode(AppMode::EditConfig { index: config_index });
+                } else {
+                    self.set_mode(AppMode::Idle);
+                }
+            }
+            Some(Entry::Group(_)) => {
+                let program_indices = flatten_group_to_programs(&self.config.entries, config_index);
+                for idx in program_indices {
+                    if let Some(Entry::Program(p)) = self.config.entries.get(idx) {
+                        if let Err(e) = crate::launcher::launch(p) {
+                            eprintln!("group launch: '{}' failed: {}", p.name, e);
+                        }
+                    }
+                }
+                self.set_mode(AppMode::Idle);
+            }
+            None => {
+                self.set_mode(AppMode::Idle);
+            }
         }
     }
 
-    pub fn populate_dialog_from_entry(&mut self, index: usize) {
-        let entry = &self.config.entries[index];
-        self.dialog_name = entry.name.clone();
-        self.dialog_caption = entry.caption.clone();
-        self.dialog_executable = entry.executable.clone();
-        self.dialog_parameters = entry.parameters.clone();
-        self.dialog_working_directory = entry.working_directory.clone();
-        self.dialog_error = None;
+    pub fn populate_program_dialog_from_index(&mut self, index: usize) {
+        if let Some(crate::config::Entry::Program(p)) = self.config.entries.get(index) {
+            self.dialog_name = p.name.clone();
+            self.dialog_caption = p.caption.clone();
+            self.dialog_executable = p.executable.clone();
+            self.dialog_parameters = p.parameters.clone();
+            self.dialog_working_directory = p.working_directory.clone();
+            self.dialog_error = None;
+        }
     }
 
     pub fn clear_dialog_fields(&mut self) {
@@ -183,7 +209,7 @@ impl KeykoffApp {
             return false;
         }
 
-        let entry = RunConfig {
+        let program = RunConfig {
             name: self.dialog_name.trim().to_string(),
             caption: self.dialog_caption.trim().to_string(),
             executable: self.dialog_executable.trim().trim_matches('"').to_string(),
@@ -192,8 +218,8 @@ impl KeykoffApp {
         };
 
         match &self.mode {
-            AppMode::NewConfig => self.config.entries.push(entry),
-            AppMode::EditConfig { index } => self.config.entries[*index] = entry,
+            AppMode::NewConfig => self.config.entries.push(Entry::Program(program)),
+            AppMode::EditConfig { index } => self.config.entries[*index] = Entry::Program(program),
             _ => {}
         }
 
