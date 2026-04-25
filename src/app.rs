@@ -16,6 +16,8 @@ pub enum AppMode {
     Input,
     NewConfig,
     EditConfig { index: usize },
+    NewGroup,
+    EditGroup { index: usize },
     ConfigList,
 }
 
@@ -55,6 +57,11 @@ pub struct KeykoffApp {
     pub dialog_working_directory: String,
     pub dialog_error: Option<String>,
     pub dialog_return_to_idle: bool,
+
+    // Group dialog state
+    pub dialog_members: Vec<String>,
+    pub dialog_member_input: String,
+    pub dialog_suggestion_index: usize,
 
     // Config list tab state
     pub config_tab: ConfigTab,
@@ -96,6 +103,9 @@ impl KeykoffApp {
             dialog_working_directory: String::new(),
             dialog_error: None,
             dialog_return_to_idle: false,
+            dialog_members: Vec::new(),
+            dialog_member_input: String::new(),
+            dialog_suggestion_index: 0,
             config_tab: ConfigTab::default(),
             _tray_icon: tray_icon,
             tray_state,
@@ -114,7 +124,8 @@ impl KeykoffApp {
                 self.selected_index = 0;
                 self.needs_focus = true;
             }
-            AppMode::NewConfig | AppMode::EditConfig { .. } => {
+            AppMode::NewConfig | AppMode::EditConfig { .. }
+            | AppMode::NewGroup | AppMode::EditGroup { .. } => {
                 self.needs_focus = true;
             }
             _ => {}
@@ -199,6 +210,26 @@ impl KeykoffApp {
         self.dialog_error = None;
     }
 
+    pub fn clear_group_dialog_fields(&mut self) {
+        self.dialog_name.clear();
+        self.dialog_caption.clear();
+        self.dialog_members.clear();
+        self.dialog_member_input.clear();
+        self.dialog_suggestion_index = 0;
+        self.dialog_error = None;
+    }
+
+    pub fn populate_group_dialog_from_index(&mut self, index: usize) {
+        if let Some(crate::config::Entry::Group(g)) = self.config.entries.get(index) {
+            self.dialog_name = g.name.clone();
+            self.dialog_caption = g.caption.clone();
+            self.dialog_members = g.members.clone();
+            self.dialog_member_input.clear();
+            self.dialog_suggestion_index = 0;
+            self.dialog_error = None;
+        }
+    }
+
     pub fn save_dialog_entry(&mut self) -> bool {
         if self.dialog_name.trim().is_empty() {
             self.dialog_error = Some("Name is required.".into());
@@ -267,7 +298,8 @@ impl KeykoffApp {
                 ));
                 ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
             }
-            AppMode::NewConfig | AppMode::EditConfig { .. } => {
+            AppMode::NewConfig | AppMode::EditConfig { .. }
+            | AppMode::NewGroup | AppMode::EditGroup { .. } => {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(true));
                 ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(500.0, 280.0)));
                 ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(350.0, 250.0)));
@@ -356,6 +388,9 @@ impl eframe::App for KeykoffApp {
             }
             AppMode::NewConfig | AppMode::EditConfig { .. } => {
                 ui::config_dialog::show(self, ctx);
+            }
+            AppMode::NewGroup | AppMode::EditGroup { .. } => {
+                ui::group_dialog::show(self, ctx);
             }
             AppMode::ConfigList => {
                 ui::config_list::show(self, ctx);
