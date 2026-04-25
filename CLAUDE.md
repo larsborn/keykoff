@@ -146,7 +146,7 @@ All fields added after the initial version use `#[serde(default)]` so existing c
 
 ### Focus management
 
-- `needs_focus` flag is set on mode entry (Input, NewConfig, EditConfig). UI code calls `response.request_focus()` on the first text field and clears the flag.
+- `needs_focus` flag is set on mode entry (Input, NewConfig, EditConfig, NewGroup, EditGroup). UI code calls `response.request_focus()` on the first text field and clears the flag.
 - `focus_requested` flag is set when the hotkey is pressed while a dialog is open. The `update()` method sends `ViewportCommand::Focus` and clears the flag.
 
 ### Hotkey re-registration
