@@ -4,6 +4,14 @@ All notable changes to keykoff will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.2] - 2026-04-25
+
+### Fixed
+
+- Config dialog layout: text fields now fill the available window width instead of using fixed sizes, Browse buttons stay right-aligned, and Save/Cancel buttons are right-aligned
+- Config dialog is resizable and tracks window size changes properly
+- Config dialog has a minimum window size (350x250) to prevent UI overflow
+
 ## [1.0.1] - 2026-04-11
 
 ### Added
