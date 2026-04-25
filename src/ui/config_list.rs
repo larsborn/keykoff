@@ -104,7 +104,7 @@ fn show_commands_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
 
         if app.config.entries.is_empty() {
             ui.add_space(20.0);
-            ui.label("No configurations yet. Click '+ New Configuration' to add one.");
+            ui.label("No configurations yet. Click '+ New Program' or '+ New Group' to add one.");
         }
     });
 
