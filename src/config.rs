@@ -143,6 +143,21 @@ pub fn find_by_name(entries: &[Entry], name: &str) -> Option<usize> {
     entries.iter().position(|e| entry_name(e) == name)
 }
 
+pub fn cascade_rename(entries: &mut [Entry], old_name: &str, new_name: &str) {
+    if old_name == new_name {
+        return;
+    }
+    for entry in entries.iter_mut() {
+        if let Entry::Group(g) = entry {
+            for m in g.members.iter_mut() {
+                if m == old_name {
+                    *m = new_name.to_string();
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,5 +251,41 @@ mod tests {
     fn find_by_name_returns_none_when_missing() {
         let entries = vec![make_program("a")];
         assert_eq!(find_by_name(&entries, "missing"), None);
+    }
+
+    #[test]
+    fn cascade_rename_updates_group_members() {
+        let mut entries = vec![
+            make_program("a"),
+            make_program("b"),
+            make_group("g", &["a", "b"]),
+        ];
+        cascade_rename(&mut entries, "a", "a2");
+        if let Entry::Group(g) = &entries[2] {
+            assert_eq!(g.members, vec!["a2".to_string(), "b".to_string()]);
+        } else {
+            panic!("expected group at index 2");
+        }
+    }
+
+    #[test]
+    fn cascade_rename_no_op_when_name_not_referenced() {
+        let mut entries = vec![make_program("a"), make_group("g", &["b"])];
+        cascade_rename(&mut entries, "a", "a2");
+        if let Entry::Group(g) = &entries[1] {
+            assert_eq!(g.members, vec!["b".to_string()]);
+        }
+    }
+
+    #[test]
+    fn cascade_rename_updates_multiple_groups() {
+        let mut entries = vec![
+            make_program("a"),
+            make_group("g1", &["a"]),
+            make_group("g2", &["a", "x"]),
+        ];
+        cascade_rename(&mut entries, "a", "a2");
+        if let Entry::Group(g) = &entries[1] { assert_eq!(g.members, vec!["a2".to_string()]); }
+        if let Entry::Group(g) = &entries[2] { assert_eq!(g.members, vec!["a2".to_string(), "x".to_string()]); }
     }
 }
