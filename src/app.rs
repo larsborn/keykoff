@@ -244,6 +244,7 @@ impl KeykoffApp {
             AppMode::NewConfig | AppMode::EditConfig { .. } => {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(true));
                 ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(500.0, 280.0)));
+                ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(egui::vec2(350.0, 250.0)));
                 ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
                     egui::WindowLevel::Normal,
                 ));
