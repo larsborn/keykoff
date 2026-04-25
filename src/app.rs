@@ -262,6 +262,72 @@ impl KeykoffApp {
         true
     }
 
+    pub fn save_group_dialog(&mut self) -> bool {
+        let trimmed_name = self.dialog_name.trim().to_string();
+        if trimmed_name.is_empty() {
+            self.dialog_error = Some("Name is required.".into());
+            return false;
+        }
+        if self.dialog_members.is_empty() {
+            self.dialog_error = Some("At least one member is required.".into());
+            return false;
+        }
+
+        // Determine the previous name (for cascade-rename when editing).
+        let prev_name: Option<String> = match self.mode {
+            AppMode::EditGroup { index } => match self.config.entries.get(index) {
+                Some(crate::config::Entry::Group(g)) => Some(g.name.clone()),
+                _ => None,
+            },
+            _ => None,
+        };
+
+        // Uniqueness: name must not collide with any other entry.
+        let collides = self
+            .config
+            .entries
+            .iter()
+            .enumerate()
+            .any(|(i, e)| {
+                let name = crate::config::entry_name(e);
+                let is_self = matches!(self.mode, AppMode::EditGroup { index } if index == i);
+                !is_self && name == trimmed_name
+            });
+        if collides {
+            self.dialog_error = Some("Name already used by another entry.".into());
+            return false;
+        }
+
+        let group = crate::config::RunGroup {
+            name: trimmed_name.clone(),
+            caption: self.dialog_caption.trim().to_string(),
+            members: self.dialog_members.clone(),
+        };
+
+        match self.mode {
+            AppMode::NewGroup => self
+                .config
+                .entries
+                .push(crate::config::Entry::Group(group)),
+            AppMode::EditGroup { index } => {
+                self.config.entries[index] = crate::config::Entry::Group(group);
+            }
+            _ => {}
+        }
+
+        if let Some(prev) = prev_name {
+            if prev != trimmed_name {
+                crate::config::cascade_rename(&mut self.config.entries, &prev, &trimmed_name);
+            }
+        }
+
+        if let Err(e) = config::save_config(&self.config) {
+            self.dialog_error = Some(format!("Failed to save: {}", e));
+            return false;
+        }
+        true
+    }
+
     pub fn reregister_hotkey(&mut self) {
         let _ = self.hotkey_manager.unregister(self.hotkey);
         self.hotkey = crate::hotkey::hotkey_from_config(&self.config);
