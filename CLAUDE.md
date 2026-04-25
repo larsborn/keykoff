@@ -35,6 +35,7 @@ Single eframe window with mode-based UI switching:
 - **Idle** — window parked off-screen (1x1 at -10000,-10000), tray icon + hotkey active
 - **Input** — borderless always-on-top overlay at user-configured position, typeahead dropdown with numbered results (1-9)
 - **NewConfig / EditConfig** — dialog with name/caption/exe/params/workdir fields; Enter in any field saves; Name field auto-focused on open
+- **NewGroup / EditGroup** — dialog for creating or editing an execution group: name, caption, and a type-to-add member list with autocomplete suggestions filtered by substring, with self-reference and cycle prevention.
 - **ConfigList** — tabbed settings window (Commands, Positioning, Hotkey, Autostart)
 
 Mode transitions reconfigure window properties (size, position, decorations) via `ViewportCommand`.
@@ -60,14 +61,17 @@ Mode transitions reconfigure window properties (size, position, decorations) via
 
 ### Navigation flow
 
-- **Input overlay -> Enter on match** -> launch program, return to Idle
+- **Input overlay -> Enter on match** -> launch program or group, return to Idle
 - **Input overlay -> Enter on no match** -> open NewConfig dialog (returns to Idle after save, not ConfigList)
-- **Input overlay -> Ctrl+Enter or right-click** -> open EditConfig for selected result (returns to Idle after save)
+- **Input overlay -> Ctrl+Enter or right-click** -> open EditConfig/EditGroup for selected result (returns to Idle after save)
 - **Input overlay -> number key 1-9** -> launch corresponding result directly
 - **Launch failure** -> open EditConfig with error message (returns to Idle after save)
 - **Config dialog -> Save (or Enter in any field)** -> returns to Idle if opened from overlay/launch-error, ConfigList if opened from config list
 - **Config dialog -> Cancel or Escape** -> returns to Idle
 - **Config list -> opened from tray** -> Escape returns to Idle
+- **Commands tab -> "+ New Group" button** -> open NewGroup dialog (returns to Idle after save)
+- **Commands tab -> Edit on Group entry** -> open EditGroup dialog (returns to Idle after save)
+- **Group launch** -> walks members depth-first, deduplicates programs, launches each via detached process; missing members are silently skipped; cycles are guarded by visited-set
 
 The `dialog_return_to_idle` flag on `KeykoffApp` tracks whether the config dialog should return to Idle (true) or ConfigList (false) after save.
 
@@ -86,21 +90,31 @@ src/
     input_overlay.rs   # Typeahead search overlay with numbered results (1-9)
     config_dialog.rs   # New/edit configuration form (name, caption, exe, params, workdir)
     config_list.rs     # Tabbed settings: Commands list, Positioning tab, Hotkey tab, Autostart tab
+    group_dialog.rs    # New/edit execution group form (name, caption, type-to-add member list)
 ```
 
 ## Data
 
 Configurations are stored as JSON at `%APPDATA%/keykoff/config.json`.
 
+The `entries` list is polymorphic: each entry has a `kind` field (`program` or `group`) that determines the variant. Backwards compatibility is maintained — entries lacking a `kind` field deserialize as programs.
+
 ```json
 {
   "entries": [
     {
+      "kind": "program",
       "name": "mumble",
       "caption": "Mumble Voice Comms",
       "executable": "C:\\Program Files\\Mumble\\mumble.exe",
       "parameters": "",
       "working_directory": ""
+    },
+    {
+      "kind": "group",
+      "name": "comms-suite",
+      "caption": "Communications Apps",
+      "members": ["mumble", "discord"]
     }
   ],
   "overlay_x": 100.0,
@@ -117,7 +131,9 @@ All fields added after the initial version use `#[serde(default)]` so existing c
 ### Data model
 
 - **`RunConfig`** — `name`, `caption` (optional), `executable`, `parameters`, `working_directory`
-- **`AppConfig`** — `entries: Vec<RunConfig>`, `overlay_x`, `overlay_y`, `overlay_width`, `hotkey_key`, `hotkey_alt`, `hotkey_ctrl`
+- **`RunGroup`** — `name`, `caption` (optional), `members: Vec<String>` (list of entry names)
+- **`Entry`** — enum with variants `Program(RunConfig)` and `Group(RunGroup)`, distinguished by `kind` field in JSON
+- **`AppConfig`** — `entries: Vec<Entry>`, `overlay_x`, `overlay_y`, `overlay_width`, `hotkey_key`, `hotkey_alt`, `hotkey_ctrl`
 
 ## Key implementation details
 
@@ -144,6 +160,14 @@ The Hotkey tab in ConfigList allows changing the key (F1-F12) and modifiers (ALT
 ### Commands list layout
 
 In the Commands tab of ConfigList, each row uses a right-to-left outer layout so Edit/Delete buttons are always visible (allocated first). The remaining space shows the command name (fixed-width column sized to the widest name) and executable path (truncated via `Label::truncate()`).
+
+### Group cascade updates
+
+When a program or group is renamed or deleted, all groups that reference it are automatically updated:
+- **Cascade rename** — all member references in other groups are updated to the new name
+- **Cascade delete** — the entry is removed from all groups that reference it
+- **Cycle prevention** — the group dialog prevents adding a group to itself and prevents adding an entry that would create a cycle (checked during member add via `would_cycle()`)
+- **Missing members** — during group launch, missing members are silently skipped; the group still launches all reachable members
 
 ## Changelog
 
