@@ -103,7 +103,7 @@ mod tests {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cargo test --lib config::tests`
+Run: `cargo test config::tests`
 Expected: compile errors (no `Entry`, no `RunGroup`).
 
 - [ ] **Step 3: Add the types and custom `Deserialize`**
@@ -158,7 +158,7 @@ Keep the existing `RunConfig` struct and the existing `AppConfig` (still using `
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cargo test --lib config::tests`
+Run: `cargo test config::tests`
 Expected: 5 passed.
 
 - [ ] **Step 5: Commit**
@@ -219,7 +219,7 @@ git commit -m "add Entry enum and RunGroup with backward-compat deserializer"
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cargo test --lib config::tests::find_by_name`
+Run: `cargo test config::tests::find_by_name`
 Expected: compile errors (function and helpers undefined).
 
 - [ ] **Step 3: Implement `find_by_name` and the public `entry_name` accessor**
@@ -247,7 +247,7 @@ Remove the duplicate `entry_name` helper inside `mod tests` (replace its body to
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cargo test --lib config::tests`
+Run: `cargo test config::tests`
 Expected: all passing.
 
 - [ ] **Step 5: Commit**
@@ -306,7 +306,7 @@ git commit -m "add entry_name and find_by_name helpers"
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cargo test --lib config::tests::cascade_rename`
+Run: `cargo test config::tests::cascade_rename`
 Expected: compile error (function undefined).
 
 - [ ] **Step 3: Implement**
@@ -332,7 +332,7 @@ pub fn cascade_rename(entries: &mut [Entry], old_name: &str, new_name: &str) {
 
 - [ ] **Step 4: Run tests to verify pass**
 
-Run: `cargo test --lib config::tests`
+Run: `cargo test config::tests`
 Expected: all passing.
 
 - [ ] **Step 5: Commit**
@@ -382,7 +382,7 @@ git commit -m "add cascade_rename helper"
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cargo test --lib config::tests::cascade_delete`
+Run: `cargo test config::tests::cascade_delete`
 Expected: compile error.
 
 - [ ] **Step 3: Implement**
@@ -399,7 +399,7 @@ pub fn cascade_delete(entries: &mut [Entry], name: &str) {
 
 - [ ] **Step 4: Run tests**
 
-Run: `cargo test --lib config::tests`
+Run: `cargo test config::tests`
 Expected: all passing.
 
 - [ ] **Step 5: Commit**
@@ -454,7 +454,7 @@ git commit -m "add cascade_delete helper"
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cargo test --lib config::tests::would_cycle`
+Run: `cargo test config::tests::would_cycle`
 Expected: compile error.
 
 - [ ] **Step 3: Implement**
@@ -490,7 +490,7 @@ pub fn would_cycle(entries: &[Entry], editing_group_name: &str, candidate: &str)
 
 - [ ] **Step 4: Run tests**
 
-Run: `cargo test --lib config::tests`
+Run: `cargo test config::tests`
 Expected: all passing.
 
 - [ ] **Step 5: Commit**
@@ -561,7 +561,7 @@ git commit -m "add would_cycle helper for group membership"
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cargo test --lib config::tests::flatten`
+Run: `cargo test config::tests::flatten`
 Expected: compile error.
 
 - [ ] **Step 3: Implement**
@@ -607,7 +607,7 @@ pub fn flatten_group_to_programs(entries: &[Entry], start_index: usize) -> Vec<u
 
 - [ ] **Step 4: Run tests**
 
-Run: `cargo test --lib config::tests`
+Run: `cargo test config::tests`
 Expected: all passing.
 
 - [ ] **Step 5: Commit**
@@ -861,7 +861,7 @@ Manual smoke test:
 
 - [ ] **Step 6: Verify the unit-test suite still passes**
 
-Run: `cargo test --lib`
+Run: `cargo test`
 Expected: all `config::tests` passing.
 
 - [ ] **Step 7: Commit**
@@ -1563,7 +1563,7 @@ git commit -m "document execution groups feature"
 
 Before marking the feature done, run through:
 
-- [ ] `cargo test --lib` — all `config::tests` passing.
+- [ ] `cargo test` — all `config::tests` passing.
 - [ ] `cargo build` — clean (no warnings introduced beyond pre-existing).
 - [ ] `cargo build --release` — builds.
 - [ ] Manual smoke:
