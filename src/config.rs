@@ -12,6 +12,48 @@ pub struct RunConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunGroup {
+    pub name: String,
+    #[serde(default)]
+    pub caption: String,
+    #[serde(default)]
+    pub members: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Entry {
+    Program(RunConfig),
+    Group(RunGroup),
+}
+
+impl<'de> serde::Deserialize<'de> for Entry {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut value = serde_json::Value::deserialize(deserializer)?;
+        if let Some(obj) = value.as_object_mut() {
+            if !obj.contains_key("kind") {
+                obj.insert("kind".into(), serde_json::Value::String("program".into()));
+            }
+        }
+        // Re-deserialize through a private helper enum that uses the standard tagged-enum derivation.
+        #[derive(serde::Deserialize)]
+        #[serde(tag = "kind", rename_all = "lowercase")]
+        enum Helper {
+            Program(RunConfig),
+            Group(RunGroup),
+        }
+        let h: Helper = serde_json::from_value(value).map_err(serde::de::Error::custom)?;
+        Ok(match h {
+            Helper::Program(p) => Entry::Program(p),
+            Helper::Group(g) => Entry::Group(g),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub entries: Vec<RunConfig>,
     #[serde(default = "default_overlay_x")]
@@ -88,4 +130,65 @@ pub fn save_config(config: &AppConfig) -> Result<(), Box<dyn std::error::Error>>
     let json = serde_json::to_string_pretty(config)?;
     std::fs::write(&path, json)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_entry_without_kind_loads_as_program() {
+        let json = r#"{"name":"foo","caption":"","executable":"x.exe","parameters":"","working_directory":""}"#;
+        let entry: Entry = serde_json::from_str(json).unwrap();
+        match entry {
+            Entry::Program(p) => assert_eq!(p.name, "foo"),
+            _ => panic!("expected Program, got {:?}", entry),
+        }
+    }
+
+    #[test]
+    fn entry_with_kind_program_loads_as_program() {
+        let json = r#"{"kind":"program","name":"foo","caption":"","executable":"x.exe","parameters":"","working_directory":""}"#;
+        let entry: Entry = serde_json::from_str(json).unwrap();
+        assert!(matches!(entry, Entry::Program(_)));
+    }
+
+    #[test]
+    fn entry_with_kind_group_loads_as_group() {
+        let json = r#"{"kind":"group","name":"g","caption":"","members":["a","b"]}"#;
+        let entry: Entry = serde_json::from_str(json).unwrap();
+        match entry {
+            Entry::Group(g) => {
+                assert_eq!(g.name, "g");
+                assert_eq!(g.members, vec!["a".to_string(), "b".to_string()]);
+            }
+            _ => panic!("expected Group, got {:?}", entry),
+        }
+    }
+
+    #[test]
+    fn group_round_trip() {
+        let g = Entry::Group(RunGroup {
+            name: "g".into(),
+            caption: "c".into(),
+            members: vec!["a".into()],
+        });
+        let s = serde_json::to_string(&g).unwrap();
+        let parsed: Entry = serde_json::from_str(&s).unwrap();
+        assert!(matches!(parsed, Entry::Group(_)));
+        assert!(s.contains(r#""kind":"group""#));
+    }
+
+    #[test]
+    fn program_round_trip_writes_kind() {
+        let p = Entry::Program(RunConfig {
+            name: "p".into(),
+            caption: String::new(),
+            executable: "p.exe".into(),
+            parameters: String::new(),
+            working_directory: String::new(),
+        });
+        let s = serde_json::to_string(&p).unwrap();
+        assert!(s.contains(r#""kind":"program""#));
+    }
 }
