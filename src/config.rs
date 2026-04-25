@@ -193,6 +193,43 @@ pub fn would_cycle(entries: &[Entry], editing_group_name: &str, candidate: &str)
     false
 }
 
+/// Walks the entry at `start_index` depth-first. If it's a `Program`, returns
+/// `[start_index]`. If it's a `Group`, returns the deduped list of program
+/// indices reachable transitively through its `members`. Cycles are skipped via
+/// a visited-set; unknown member names are skipped silently.
+pub fn flatten_group_to_programs(entries: &[Entry], start_index: usize) -> Vec<usize> {
+    let mut result = Vec::new();
+    let mut seen_indices = std::collections::HashSet::new();
+    let mut visited_names = std::collections::HashSet::new();
+    let mut stack: Vec<usize> = vec![start_index];
+
+    while let Some(idx) = stack.pop() {
+        if idx >= entries.len() {
+            continue;
+        }
+        let name = entry_name(&entries[idx]).to_string();
+        if !visited_names.insert(name) {
+            continue;
+        }
+        match &entries[idx] {
+            Entry::Program(_) => {
+                if seen_indices.insert(idx) {
+                    result.push(idx);
+                }
+            }
+            Entry::Group(g) => {
+                // Push members in reverse so that the first member is processed first.
+                for member in g.members.iter().rev() {
+                    if let Some(member_idx) = find_by_name(entries, member) {
+                        stack.push(member_idx);
+                    }
+                }
+            }
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -382,5 +419,53 @@ mod tests {
     fn would_cycle_unknown_candidate_is_safe() {
         let entries = vec![make_group("g", &[])];
         assert!(!would_cycle(&entries, "g", "missing"));
+    }
+
+    #[test]
+    fn flatten_returns_indices_of_programs_only() {
+        let entries = vec![
+            make_program("a"),
+            make_program("b"),
+            make_group("g", &["a", "b"]),
+        ];
+        let result = flatten_group_to_programs(&entries, 2);
+        assert_eq!(result, vec![0, 1]);
+    }
+
+    #[test]
+    fn flatten_dedups_programs_reachable_via_multiple_paths() {
+        // g1 -> [a, g2]; g2 -> [a]; flatten g1 should yield [a] once.
+        let entries = vec![
+            make_program("a"),
+            make_group("g1", &["a", "g2"]),
+            make_group("g2", &["a"]),
+        ];
+        let result = flatten_group_to_programs(&entries, 1);
+        assert_eq!(result, vec![0]);
+    }
+
+    #[test]
+    fn flatten_skips_unknown_member_names() {
+        let entries = vec![make_program("a"), make_group("g", &["a", "missing"])];
+        let result = flatten_group_to_programs(&entries, 1);
+        assert_eq!(result, vec![0]);
+    }
+
+    #[test]
+    fn flatten_handles_cycles_without_infinite_loop() {
+        // Hand-crafted cycle: g1 -> g2 -> g1; should return no programs and not loop.
+        let entries = vec![
+            make_group("g1", &["g2"]),
+            make_group("g2", &["g1"]),
+        ];
+        let result = flatten_group_to_programs(&entries, 0);
+        assert_eq!(result, Vec::<usize>::new());
+    }
+
+    #[test]
+    fn flatten_called_on_program_index_returns_just_that_index() {
+        let entries = vec![make_program("a")];
+        let result = flatten_group_to_programs(&entries, 0);
+        assert_eq!(result, vec![0]);
     }
 }
