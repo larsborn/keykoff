@@ -132,6 +132,17 @@ pub fn save_config(config: &AppConfig) -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+pub fn entry_name(entry: &Entry) -> &str {
+    match entry {
+        Entry::Program(p) => &p.name,
+        Entry::Group(g) => &g.name,
+    }
+}
+
+pub fn find_by_name(entries: &[Entry], name: &str) -> Option<usize> {
+    entries.iter().position(|e| entry_name(e) == name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -190,5 +201,40 @@ mod tests {
         });
         let s = serde_json::to_string(&p).unwrap();
         assert!(s.contains(r#""kind":"program""#));
+    }
+
+    fn make_program(name: &str) -> Entry {
+        Entry::Program(RunConfig {
+            name: name.into(),
+            caption: String::new(),
+            executable: format!("{}.exe", name),
+            parameters: String::new(),
+            working_directory: String::new(),
+        })
+    }
+
+    fn make_group(name: &str, members: &[&str]) -> Entry {
+        Entry::Group(RunGroup {
+            name: name.into(),
+            caption: String::new(),
+            members: members.iter().map(|s| s.to_string()).collect(),
+        })
+    }
+
+    fn entry_name(e: &Entry) -> &str {
+        super::entry_name(e)
+    }
+
+    #[test]
+    fn find_by_name_returns_index_when_present() {
+        let entries = vec![make_program("a"), make_group("g", &["a"]), make_program("b")];
+        assert_eq!(find_by_name(&entries, "g"), Some(1));
+        assert_eq!(find_by_name(&entries, "b"), Some(2));
+    }
+
+    #[test]
+    fn find_by_name_returns_none_when_missing() {
+        let entries = vec![make_program("a")];
+        assert_eq!(find_by_name(&entries, "missing"), None);
     }
 }
