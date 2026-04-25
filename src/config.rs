@@ -236,6 +236,7 @@ mod tests {
         })
     }
 
+    #[allow(dead_code)]
     fn entry_name(e: &Entry) -> &str {
         super::entry_name(e)
     }
