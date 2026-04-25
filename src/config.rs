@@ -158,6 +158,14 @@ pub fn cascade_rename(entries: &mut [Entry], old_name: &str, new_name: &str) {
     }
 }
 
+pub fn cascade_delete(entries: &mut [Entry], name: &str) {
+    for entry in entries.iter_mut() {
+        if let Entry::Group(g) = entry {
+            g.members.retain(|m| m != name);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,5 +296,32 @@ mod tests {
         cascade_rename(&mut entries, "a", "a2");
         if let Entry::Group(g) = &entries[1] { assert_eq!(g.members, vec!["a2".to_string()]); }
         if let Entry::Group(g) = &entries[2] { assert_eq!(g.members, vec!["a2".to_string(), "x".to_string()]); }
+    }
+
+    #[test]
+    fn cascade_delete_removes_name_from_group_members() {
+        let mut entries = vec![make_group("g", &["a", "b", "c"])];
+        cascade_delete(&mut entries, "b");
+        if let Entry::Group(g) = &entries[0] {
+            assert_eq!(g.members, vec!["a".to_string(), "c".to_string()]);
+        }
+    }
+
+    #[test]
+    fn cascade_delete_can_leave_group_empty() {
+        let mut entries = vec![make_group("g", &["a"])];
+        cascade_delete(&mut entries, "a");
+        if let Entry::Group(g) = &entries[0] {
+            assert!(g.members.is_empty());
+        }
+    }
+
+    #[test]
+    fn cascade_delete_no_op_when_name_absent() {
+        let mut entries = vec![make_group("g", &["a"])];
+        cascade_delete(&mut entries, "z");
+        if let Entry::Group(g) = &entries[0] {
+            assert_eq!(g.members, vec!["a".to_string()]);
+        }
     }
 }
