@@ -674,8 +674,8 @@ pub fn do_launch(&mut self, config_index: usize) {
     use crate::config::{flatten_group_to_programs, Entry};
     match self.config.entries.get(config_index) {
         Some(Entry::Program(_)) => {
-            // Borrow split: clone the program first so we can pass it to launch
-            // without holding the immutable borrow.
+            // Clone the program so we can subsequently call &mut self methods
+            // (e.g. populate_program_dialog_from_index) without a borrow conflict.
             let program = if let Some(Entry::Program(p)) = self.config.entries.get(config_index) {
                 p.clone()
             } else {
@@ -903,6 +903,7 @@ In the struct definition, add after the existing `// Config dialog state` block:
     // Group dialog state
     pub dialog_members: Vec<String>,
     pub dialog_member_input: String,
+    pub dialog_suggestion_index: usize,
 ```
 
 In `KeykoffApp::new`, initialize them:
@@ -910,6 +911,7 @@ In `KeykoffApp::new`, initialize them:
 ```rust
             dialog_members: Vec::new(),
             dialog_member_input: String::new(),
+            dialog_suggestion_index: 0,
 ```
 
 - [ ] **Step 3: Update `set_mode` to focus the group dialog and clear input**
@@ -942,6 +944,7 @@ pub fn clear_group_dialog_fields(&mut self) {
     self.dialog_caption.clear();
     self.dialog_members.clear();
     self.dialog_member_input.clear();
+    self.dialog_suggestion_index = 0;
     self.dialog_error = None;
 }
 
@@ -951,6 +954,7 @@ pub fn populate_group_dialog_from_index(&mut self, index: usize) {
         self.dialog_caption = g.caption.clone();
         self.dialog_members = g.members.clone();
         self.dialog_member_input.clear();
+        self.dialog_suggestion_index = 0;
         self.dialog_error = None;
     }
 }
@@ -1008,23 +1012,75 @@ git commit -m "scaffold group dialog modes and state"
 
 - [ ] **Step 1: Replace the stub with the full dialog**
 
+The dialog computes its suggestion list once per frame, displays it with the currently-selected suggestion highlighted, and supports Up/Down to move the selection and Enter to add the highlighted one. Escape dismisses the dropdown when it's showing; otherwise cancels the dialog.
+
 ```rust
 use eframe::egui;
 
 use crate::app::{AppMode, KeykoffApp};
-use crate::config::{self, would_cycle, Entry, RunGroup};
+use crate::config::{self, would_cycle, Entry};
+
+fn compute_suggestions(app: &KeykoffApp, editing_name: &str) -> Vec<String> {
+    let trimmed = app.dialog_member_input.trim().to_lowercase();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    app.config
+        .entries
+        .iter()
+        .filter_map(|e| {
+            let name = config::entry_name(e);
+            if name == editing_name {
+                return None; // exclude self
+            }
+            if app.dialog_members.iter().any(|m| m == name) {
+                return None; // already added
+            }
+            if !name.to_lowercase().contains(&trimmed) {
+                return None;
+            }
+            if would_cycle(&app.config.entries, editing_name, name) {
+                return None;
+            }
+            Some(name.to_string())
+        })
+        .take(8)
+        .collect()
+}
 
 pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
     let is_edit = matches!(app.mode, AppMode::EditGroup { .. });
     let title = if is_edit { "Edit Group" } else { "New Group" };
 
-    let editing_group_name_at_open = match app.mode {
+    // Resolve the "name to compare against for cycle detection / self-exclusion."
+    // For edits, this is the name the group had when the dialog opened (so renaming
+    // the group inside the dialog doesn't change which entry counts as "self").
+    // For new groups, the user-typed name is used.
+    let editing_name_owned: String = match app.mode {
         AppMode::EditGroup { index } => match app.config.entries.get(index) {
             Some(Entry::Group(g)) => g.name.clone(),
             _ => String::new(),
         },
-        _ => String::new(),
+        _ => app.dialog_name.clone(),
     };
+
+    let suggestions = compute_suggestions(app, &editing_name_owned);
+    if app.dialog_suggestion_index >= suggestions.len() {
+        app.dialog_suggestion_index = 0;
+    }
+    let dropdown_open = !suggestions.is_empty();
+
+    // Capture key events before the UI renders the input box so the dialog
+    // gets first crack at Up/Down/Enter/Escape (the TextEdit doesn't consume them).
+    let up_pressed = ctx.input(|i| i.key_pressed(egui::Key::ArrowUp));
+    let down_pressed = ctx.input(|i| i.key_pressed(egui::Key::ArrowDown));
+    let enter_pressed = ctx.input(|i| i.key_pressed(egui::Key::Enter));
+    let escape_pressed = ctx.input(|i| i.key_pressed(egui::Key::Escape));
+
+    let mut suggestion_clicked: Option<String> = None;
+    let mut remove_idx: Option<usize> = None;
+    let mut save_clicked = false;
+    let mut cancel_clicked = false;
 
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.heading(title);
@@ -1087,40 +1143,14 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
             );
         });
 
-        // Suggestions dropdown (only when input is non-empty)
-        let trimmed = app.dialog_member_input.trim().to_lowercase();
-        let editing_name = if is_edit { editing_group_name_at_open.as_str() } else { app.dialog_name.as_str() };
-
-        if !trimmed.is_empty() {
-            let suggestions: Vec<String> = app
-                .config
-                .entries
-                .iter()
-                .filter_map(|e| {
-                    let name = config::entry_name(e);
-                    if name == editing_name {
-                        return None; // exclude self
-                    }
-                    if app.dialog_members.iter().any(|m| m == name) {
-                        return None; // already added
-                    }
-                    if !name.to_lowercase().contains(&trimmed) {
-                        return None;
-                    }
-                    if would_cycle(&app.config.entries, editing_name, name) {
-                        return None;
-                    }
-                    Some(name.to_string())
-                })
-                .take(8)
-                .collect();
-
+        // Suggestions dropdown
+        if dropdown_open {
             ui.indent("group_suggestions", |ui| {
-                for suggestion in suggestions {
-                    let label = egui::SelectableLabel::new(false, &suggestion);
+                for (i, suggestion) in suggestions.iter().enumerate() {
+                    let selected = i == app.dialog_suggestion_index;
+                    let label = egui::SelectableLabel::new(selected, suggestion);
                     if ui.add(label).clicked() {
-                        app.dialog_members.push(suggestion);
-                        app.dialog_member_input.clear();
+                        suggestion_clicked = Some(suggestion.clone());
                     }
                 }
             });
@@ -1128,7 +1158,6 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
         ui.add_space(row_spacing);
 
         // Existing members list with × remove buttons
-        let mut remove_idx: Option<usize> = None;
         ui.indent("group_members_list", |ui| {
             for (i, member) in app.dialog_members.iter().enumerate() {
                 ui.horizontal(|ui| {
@@ -1139,9 +1168,6 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
                 });
             }
         });
-        if let Some(i) = remove_idx {
-            app.dialog_members.remove(i);
-        }
 
         if let Some(ref error) = app.dialog_error {
             ui.add_space(5.0);
@@ -1153,80 +1179,72 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
             ui.set_width(panel_width);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Cancel").clicked() {
-                    app.set_mode(AppMode::Idle);
+                    cancel_clicked = true;
                 }
                 ui.add_space(10.0);
                 if ui.button("  Save  ").clicked() {
-                    let return_to_idle = app.dialog_return_to_idle;
-                    if app.save_group_dialog() {
-                        app.dialog_return_to_idle = false;
-                        app.set_mode(if return_to_idle { AppMode::Idle } else { AppMode::ConfigList });
-                    }
+                    save_clicked = true;
                 }
             });
         });
     });
 
-    // Enter on the input adds the first matching suggestion (if any).
-    let enter_pressed = ctx.input(|i| i.key_pressed(egui::Key::Enter));
-    let escape_pressed = ctx.input(|i| i.key_pressed(egui::Key::Escape));
+    // Apply UI-loop side effects.
+    if let Some(i) = remove_idx {
+        app.dialog_members.remove(i);
+    }
+    if let Some(name) = suggestion_clicked {
+        app.dialog_members.push(name);
+        app.dialog_member_input.clear();
+        app.dialog_suggestion_index = 0;
+    }
 
+    // Keyboard navigation for the suggestions dropdown.
+    if dropdown_open {
+        if down_pressed && app.dialog_suggestion_index + 1 < suggestions.len() {
+            app.dialog_suggestion_index += 1;
+        }
+        if up_pressed && app.dialog_suggestion_index > 0 {
+            app.dialog_suggestion_index -= 1;
+        }
+    }
+
+    // Enter: if the dropdown is open, add the highlighted suggestion; otherwise save.
     if enter_pressed {
-        let trimmed = app.dialog_member_input.trim().to_lowercase();
-        let editing_name_owned = if is_edit { editing_group_name_at_open.clone() } else { app.dialog_name.clone() };
-        if !trimmed.is_empty() {
-            // Pick the first matching suggestion and add it.
-            let first = app
-                .config
-                .entries
-                .iter()
-                .find_map(|e| {
-                    let name = config::entry_name(e);
-                    if name == editing_name_owned {
-                        return None;
-                    }
-                    if app.dialog_members.iter().any(|m| m == name) {
-                        return None;
-                    }
-                    if !name.to_lowercase().contains(&trimmed) {
-                        return None;
-                    }
-                    if would_cycle(&app.config.entries, &editing_name_owned, name) {
-                        return None;
-                    }
-                    Some(name.to_string())
-                });
-            if let Some(name) = first {
+        if dropdown_open {
+            if let Some(name) = suggestions.get(app.dialog_suggestion_index).cloned() {
                 app.dialog_members.push(name);
                 app.dialog_member_input.clear();
+                app.dialog_suggestion_index = 0;
             }
         } else {
-            // Empty input + Enter saves.
-            let return_to_idle = app.dialog_return_to_idle;
-            if app.save_group_dialog() {
-                app.dialog_return_to_idle = false;
-                app.set_mode(if return_to_idle { AppMode::Idle } else { AppMode::ConfigList });
-            }
+            save_clicked = true;
         }
     }
 
+    // Escape: if the dropdown is showing, dismiss it (clear input); otherwise cancel.
     if escape_pressed {
-        // If suggestions are visible, dismiss them by clearing the input; otherwise cancel.
-        if !app.dialog_member_input.is_empty() {
+        if dropdown_open {
             app.dialog_member_input.clear();
+            app.dialog_suggestion_index = 0;
         } else {
-            app.set_mode(AppMode::Idle);
+            cancel_clicked = true;
         }
     }
 
-    // Suppress the unused variable warning on builds where editing_group_name_at_open
-    // is consumed only inside one branch.
-    let _ = &editing_group_name_at_open;
-    let _: &str = &RunGroup { name: String::new(), caption: String::new(), members: vec![] }.name;
+    if cancel_clicked {
+        app.set_mode(AppMode::Idle);
+        return;
+    }
+    if save_clicked {
+        let return_to_idle = app.dialog_return_to_idle;
+        if app.save_group_dialog() {
+            app.dialog_return_to_idle = false;
+            app.set_mode(if return_to_idle { AppMode::Idle } else { AppMode::ConfigList });
+        }
+    }
 }
 ```
-
-The trailing `let _: &str = &RunGroup{...}.name;` line is a smell — remove it. (It's only there in case `RunGroup` would otherwise be unused; verify it's actually used in the imports above and drop the dummy line.) The actual import `use crate::config::{self, would_cycle, Entry, RunGroup};` may not need `RunGroup` — drop unused imports.
 
 - [ ] **Step 2: Add `save_group_dialog` to `KeykoffApp`**
 
@@ -1401,7 +1419,7 @@ Run: `cargo build`
 Expected: clean.
 
 Manual smoke:
-1. Run `cargo run`, open settings via tray ("Configurations…").
+1. Run `cargo run`, open settings via tray ("Edit Configurations").
 2. Click "+ New Program" → program dialog appears as before, save creates a program.
 3. Click "+ New Group" → group dialog appears, type a member name, see suggestions, click to add, Save.
 4. Verify group appears in the list with `-> N members` summary.
