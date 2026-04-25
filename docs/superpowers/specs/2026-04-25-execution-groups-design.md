@@ -92,11 +92,11 @@ Names live in a single namespace shared by programs and groups. The save path in
 
 ### Cascading rename
 
-When the user saves a name change for any entry (program or group), iterate every `Entry::Group` in `config.entries` and replace each `members` string equal to the old name with the new name. Save the config once after the rewrite.
+When the user saves a name change for any entry (program or group), the cascade runs **after** the name-uniqueness validation has passed (otherwise a clash could silently rewrite unrelated members). Iterate every `Entry::Group` in `config.entries` and replace each `members` string equal to the old name with the new name. Save the config once after the rewrite.
 
 ### Cascading delete
 
-When the user deletes any entry, iterate every `Entry::Group` and remove the deleted name from each `members` list. Empty groups are allowed (they simply launch nothing). Save the config once after the rewrite.
+When the user deletes any entry, iterate every `Entry::Group` and remove the deleted name from each `members` list. Empty groups are allowed *as a result of cascade* (they simply launch nothing) — this is intentionally asymmetric with the save-time rule that requires at least one member when creating or editing a group via the dialog. Save the config once after the rewrite.
 
 ### Cycle prevention
 
@@ -171,7 +171,7 @@ Members:     [type to add...___]   ← autocomplete dropdown of matches
 - The Members textbox shows a dropdown of suggestions while the user types. Up/Down + Enter to pick; Enter on a picked suggestion adds it and clears the textbox.
 - Each member row has a × button to remove that member.
 - Save validates and, on success, performs cascade-rename and returns to ConfigList (or Idle, per `dialog_return_to_idle`, mirroring program-dialog behavior).
-- Escape cancels.
+- Escape: if the autocomplete dropdown is open and showing suggestions, Escape closes the dropdown only; otherwise Escape cancels the dialog. (One press to dismiss the dropdown, a second press to leave the dialog.)
 
 ### Input overlay (`input_overlay.rs`)
 
