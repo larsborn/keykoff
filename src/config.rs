@@ -166,6 +166,33 @@ pub fn cascade_delete(entries: &mut [Entry], name: &str) {
     }
 }
 
+/// Returns true iff adding `candidate` to `editing_group_name`'s members would
+/// create a cycle (i.e., `candidate` is the group itself, or transitively
+/// reaches it via group members).
+pub fn would_cycle(entries: &[Entry], editing_group_name: &str, candidate: &str) -> bool {
+    if candidate == editing_group_name {
+        return true;
+    }
+    let mut stack = vec![candidate.to_string()];
+    let mut visited = std::collections::HashSet::new();
+    while let Some(name) = stack.pop() {
+        if !visited.insert(name.clone()) {
+            continue;
+        }
+        if name == editing_group_name {
+            return true;
+        }
+        if let Some(idx) = find_by_name(entries, &name) {
+            if let Entry::Group(g) = &entries[idx] {
+                for m in &g.members {
+                    stack.push(m.clone());
+                }
+            }
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323,5 +350,37 @@ mod tests {
         if let Entry::Group(g) = &entries[0] {
             assert_eq!(g.members, vec!["a".to_string()]);
         }
+    }
+
+    #[test]
+    fn would_cycle_self_reference() {
+        let entries = vec![make_group("g", &[])];
+        // Adding "g" to its own members is a cycle.
+        assert!(would_cycle(&entries, "g", "g"));
+    }
+
+    #[test]
+    fn would_cycle_program_member_is_safe() {
+        let entries = vec![make_program("a"), make_group("g", &[])];
+        assert!(!would_cycle(&entries, "g", "a"));
+    }
+
+    #[test]
+    fn would_cycle_indirect() {
+        // g1 contains g2; adding g1 to g2's members would form a cycle.
+        let entries = vec![make_group("g1", &["g2"]), make_group("g2", &[])];
+        assert!(would_cycle(&entries, "g2", "g1"));
+    }
+
+    #[test]
+    fn would_cycle_unrelated_group_is_safe() {
+        let entries = vec![make_group("g1", &[]), make_group("g2", &[])];
+        assert!(!would_cycle(&entries, "g1", "g2"));
+    }
+
+    #[test]
+    fn would_cycle_unknown_candidate_is_safe() {
+        let entries = vec![make_group("g", &[])];
+        assert!(!would_cycle(&entries, "g", "missing"));
     }
 }
