@@ -10,6 +10,8 @@ const AUTOSTART_REG_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 const AUTOSTART_VALUE_NAME: &str = "keykoff";
 
 enum ListAction {
+    NewProgram,
+    NewGroup,
     Edit(usize),
     Delete(usize),
 }
@@ -41,10 +43,16 @@ fn show_commands_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
     let mut action: Option<ListAction> = None;
 
     ui.add_space(5.0);
-    if ui.button("+ New Configuration").clicked() {
-        app.clear_dialog_fields();
-        action = Some(ListAction::Edit(usize::MAX));
-    }
+    ui.horizontal(|ui| {
+        if ui.button("+ New Program").clicked() {
+            app.clear_dialog_fields();
+            action = Some(ListAction::NewProgram);
+        }
+        if ui.button("+ New Group").clicked() {
+            app.clear_group_dialog_fields();
+            action = Some(ListAction::NewGroup);
+        }
+    });
 
     ui.add_space(10.0);
     ui.separator();
@@ -101,9 +109,13 @@ fn show_commands_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
     });
 
     match action {
-        Some(ListAction::Edit(i)) if i == usize::MAX => {
+        Some(ListAction::NewProgram) => {
             app.clear_dialog_fields();
             app.set_mode(AppMode::NewConfig);
+        }
+        Some(ListAction::NewGroup) => {
+            app.clear_group_dialog_fields();
+            app.set_mode(AppMode::NewGroup);
         }
         Some(ListAction::Edit(i)) => match app.config.entries.get(i) {
             Some(crate::config::Entry::Program(_)) => {
@@ -111,12 +123,17 @@ fn show_commands_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
                 app.set_mode(AppMode::EditConfig { index: i });
             }
             Some(crate::config::Entry::Group(_)) => {
-                // Wired in Task 10/11.
+                app.populate_group_dialog_from_index(i);
+                app.set_mode(AppMode::EditGroup { index: i });
             }
             None => {}
         },
         Some(ListAction::Delete(i)) => {
+            let deleted_name = app.config.entries.get(i).map(|e| crate::config::entry_name(e).to_string());
             app.config.entries.remove(i);
+            if let Some(name) = deleted_name {
+                crate::config::cascade_delete(&mut app.config.entries, &name);
+            }
             let _ = config::save_config(&app.config);
         }
         None => {}
