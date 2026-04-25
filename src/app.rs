@@ -6,7 +6,7 @@ use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use tray_icon::menu::MenuEvent;
 use tray_icon::TrayIcon;
 
-use crate::config::{self, AppConfig, Entry, RunConfig};
+use crate::config::{self, AppConfig, RunConfig};
 use crate::tray::TrayState;
 use crate::ui;
 
@@ -240,25 +240,61 @@ impl KeykoffApp {
             return false;
         }
 
+        let trimmed_name = self.dialog_name.trim().to_string();
+
+        // Uniqueness check: name must not collide with any other entry.
+        let collides = self
+            .config
+            .entries
+            .iter()
+            .enumerate()
+            .any(|(i, e)| {
+                let name = crate::config::entry_name(e);
+                let is_self = matches!(self.mode, AppMode::EditConfig { index } if index == i);
+                !is_self && name == trimmed_name
+            });
+        if collides {
+            self.dialog_error = Some("Name already used by another entry.".into());
+            return false;
+        }
+
+        let prev_name: Option<String> = match self.mode {
+            AppMode::EditConfig { index } => match self.config.entries.get(index) {
+                Some(crate::config::Entry::Program(p)) => Some(p.name.clone()),
+                _ => None,
+            },
+            _ => None,
+        };
+
         let program = RunConfig {
-            name: self.dialog_name.trim().to_string(),
+            name: trimmed_name.clone(),
             caption: self.dialog_caption.trim().to_string(),
             executable: self.dialog_executable.trim().trim_matches('"').to_string(),
             parameters: self.dialog_parameters.trim().to_string(),
             working_directory: self.dialog_working_directory.trim().to_string(),
         };
 
-        match &self.mode {
-            AppMode::NewConfig => self.config.entries.push(Entry::Program(program)),
-            AppMode::EditConfig { index } => self.config.entries[*index] = Entry::Program(program),
+        match self.mode {
+            AppMode::NewConfig => self
+                .config
+                .entries
+                .push(crate::config::Entry::Program(program)),
+            AppMode::EditConfig { index } => {
+                self.config.entries[index] = crate::config::Entry::Program(program);
+            }
             _ => {}
+        }
+
+        if let Some(prev) = prev_name {
+            if prev != trimmed_name {
+                crate::config::cascade_rename(&mut self.config.entries, &prev, &trimmed_name);
+            }
         }
 
         if let Err(e) = config::save_config(&self.config) {
             self.dialog_error = Some(format!("Failed to save: {}", e));
             return false;
         }
-
         true
     }
 
