@@ -8,14 +8,18 @@ Taking inspiration from the great program [QKLaunch](https://qkl.sourceforge.net
 
 ## How it works
 
-Keykoff lives in your system tray. Press **ALT+F10** (configurable) and a small input overlay appears. Type a few characters to filter your saved commands, then:
+Keykoff lives in your system tray. Press **ALT+F10** (configurable) and a small input overlay appears. Type a few characters to filter your saved commands and execution groups, then:
 
 - Press **1-9** to launch a result directly
 - Press **Enter** to launch the selected result
 - Press **Escape** to dismiss
 - Press **Ctrl+Enter** or **right-click** a result to edit it
 
-If your input doesn't match any command, pressing Enter opens a dialog to create a new one.
+If your input doesn't match anything, pressing Enter opens a dialog to create a new command.
+
+### Execution groups
+
+A group bundles several existing commands (or other groups) under a single name. Launching the group launches every reachable program at once. Renaming or deleting a command automatically updates any groups that reference it. Create one from the Commands tab in settings via the **+ New Group** button.
 
 ## Getting started
 

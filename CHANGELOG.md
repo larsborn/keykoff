@@ -4,11 +4,16 @@ All notable changes to keykoff will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.1.0] - 2026-04-26
 
 ### Added
 
 - Execution groups: bundle multiple programs (or other groups) under a single name. Launching a group launches every reachable program (deduped, depth-first, cycle-protected). Renaming or deleting a referenced entry automatically updates groups that use it. New "+ New Group" button in the Commands tab; group dialog supports type-to-add member autocomplete with self-reference and cycle prevention.
+- Right-click (or Ctrl+Enter) on a group in the input overlay now opens the EditGroup dialog (previously a no-op for groups).
+
+### Fixed
+
+- Group dialog: pressing Tab to focus a suggestion and then Enter no longer adds the same member twice.
 
 ## [1.0.2] - 2026-04-25
 
