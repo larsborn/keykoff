@@ -176,6 +176,10 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
     if let Some(i) = remove_idx {
         app.dialog_members.remove(i);
     }
+    // If Tab moved focus to a SelectableLabel and Enter activated it, .clicked()
+    // returns true AND the keyboard Enter handler below would also fire on the
+    // same press — guard against double-add.
+    let suggestion_added_via_click = suggestion_clicked.is_some();
     if let Some(name) = suggestion_clicked {
         app.dialog_members.push(name);
         app.dialog_member_input.clear();
@@ -193,7 +197,7 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
     }
 
     // Enter: if the dropdown is open, add the highlighted suggestion; otherwise save.
-    if enter_pressed {
+    if enter_pressed && !suggestion_added_via_click {
         if dropdown_open {
             if let Some(name) = suggestions.get(app.dialog_suggestion_index).cloned() {
                 app.dialog_members.push(name);

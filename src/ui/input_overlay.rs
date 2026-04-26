@@ -15,10 +15,18 @@ const NUMBER_KEYS: [egui::Key; 9] = [
 ];
 
 fn open_edit(app: &mut KeykoffApp, config_idx: usize) {
-    if matches!(app.config.entries.get(config_idx), Some(crate::config::Entry::Program(_))) {
-        app.populate_program_dialog_from_index(config_idx);
-        app.dialog_return_to_idle = true;
-        app.set_mode(AppMode::EditConfig { index: config_idx });
+    match app.config.entries.get(config_idx) {
+        Some(crate::config::Entry::Program(_)) => {
+            app.populate_program_dialog_from_index(config_idx);
+            app.dialog_return_to_idle = true;
+            app.set_mode(AppMode::EditConfig { index: config_idx });
+        }
+        Some(crate::config::Entry::Group(_)) => {
+            app.populate_group_dialog_from_index(config_idx);
+            app.dialog_return_to_idle = true;
+            app.set_mode(AppMode::EditGroup { index: config_idx });
+        }
+        None => {}
     }
 }
 
