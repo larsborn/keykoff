@@ -444,7 +444,12 @@ impl KeykoffApp {
             if event.id == self.hotkey.id() && event.state == HotKeyState::Pressed {
                 match self.mode {
                     AppMode::Idle => self.set_mode(AppMode::Input),
-                    AppMode::Input => self.set_mode(AppMode::Idle),
+                    AppMode::Input => {
+                        // Re-pressing the hotkey while the overlay is visible must not hide it.
+                        // Raise the window and re-focus the text input; preserve typed text.
+                        self.focus_requested = true;
+                        self.needs_focus = true;
+                    }
                     _ => self.focus_requested = true,
                 }
             }

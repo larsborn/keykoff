@@ -56,11 +56,12 @@ Mode transitions reconfigure window properties (size, position, decorations) via
 | Current mode | Hotkey action |
 |---|---|
 | Idle | Switch to Input mode |
-| Input | Switch to Idle mode |
+| Input | Re-focus overlay (window + text field); never hides. Escape is the only keyboard dismissal. |
 | Any other (config dialog, config list) | Bring window to front (`ViewportCommand::Focus`) |
 
 ### Navigation flow
 
+- **Input overlay -> Escape** -> return to Idle (only keyboard way to dismiss without launching; the hotkey itself never hides the overlay)
 - **Input overlay -> Enter on match** -> launch program or group, return to Idle
 - **Input overlay -> Enter on no match** -> open NewConfig dialog (returns to Idle after save, not ConfigList)
 - **Input overlay -> Ctrl+Enter or right-click** -> open EditConfig/EditGroup for selected result (returns to Idle after save)

@@ -4,6 +4,12 @@ All notable changes to keykoff will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.1] - 2026-05-24
+
+### Fixed
+
+- Pressing the hotkey while the input overlay is visible no longer hides it; it now re-focuses the overlay (window + text field) and preserves any typed text. Eliminates flaky "sometimes hides" behavior caused by Windows hotkey auto-repeat. Escape remains the keyboard way to dismiss the overlay.
+
 ## [1.1.0] - 2026-04-26
 
 ### Added
