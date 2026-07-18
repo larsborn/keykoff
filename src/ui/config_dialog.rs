@@ -10,6 +10,9 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
         "New Configuration"
     };
 
+    let mut save_requested = false;
+    let mut cancel_requested = false;
+
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.heading(title);
         ui.add_space(10.0);
@@ -123,37 +126,32 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
             ui.set_width(panel_width);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Cancel").clicked() {
-                    app.set_mode(AppMode::Idle);
+                    cancel_requested = true;
                 }
                 ui.add_space(10.0);
                 if ui.button("  Save  ").clicked() {
-                    let return_to_idle = app.dialog_return_to_idle;
-                    if app.save_dialog_entry() {
-                        app.dialog_return_to_idle = false;
-                        app.set_mode(if return_to_idle {
-                            AppMode::Idle
-                        } else {
-                            AppMode::ConfigList
-                        });
-                    }
+                    save_requested = true;
                 }
             });
         });
     });
 
     if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
-        app.set_mode(AppMode::Idle);
+        cancel_requested = true;
+    }
+    if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
+        save_requested = true;
     }
 
-    if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
-        let return_to_idle = app.dialog_return_to_idle;
-        if app.save_dialog_entry() {
-            app.dialog_return_to_idle = false;
-            app.set_mode(if return_to_idle {
-                AppMode::Idle
-            } else {
-                AppMode::ConfigList
-            });
-        }
+    if cancel_requested {
+        app.set_mode(AppMode::Idle);
+        return;
+    }
+    if save_requested && app.save_dialog_entry() {
+        app.set_mode(if app.dialog_return_to_idle {
+            AppMode::Idle
+        } else {
+            AppMode::ConfigList
+        });
     }
 }

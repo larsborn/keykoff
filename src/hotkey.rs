@@ -43,8 +43,14 @@ pub fn hotkey_from_config(config: &AppConfig) -> HotKey {
 }
 
 pub fn create_hotkey_manager(config: &AppConfig) -> (GlobalHotKeyManager, HotKey) {
-    let manager = GlobalHotKeyManager::new().unwrap();
+    let manager = GlobalHotKeyManager::new().expect("failed to create global hotkey manager");
     let hotkey = hotkey_from_config(config);
-    manager.register(hotkey).unwrap();
+    // Registration can fail if another app owns the binding. Don't panic —
+    // the release build has no console, so a panic here is an invisible
+    // startup death. The tray menu still works, and the user can pick a
+    // different binding in the Hotkey tab (which re-registers).
+    if let Err(e) = manager.register(hotkey) {
+        eprintln!("keykoff: failed to register hotkey: {}", e);
+    }
     (manager, hotkey)
 }

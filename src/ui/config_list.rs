@@ -45,11 +45,9 @@ fn show_commands_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
     ui.add_space(5.0);
     ui.horizontal(|ui| {
         if ui.button("+ New Program").clicked() {
-            app.clear_dialog_fields();
             action = Some(ListAction::NewProgram);
         }
         if ui.button("+ New Group").clicked() {
-            app.clear_group_dialog_fields();
             action = Some(ListAction::NewGroup);
         }
     });

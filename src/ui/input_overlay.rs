@@ -14,6 +14,16 @@ const NUMBER_KEYS: [egui::Key; 9] = [
     egui::Key::Num9,
 ];
 
+fn row_text(entry: &crate::config::Entry, display_idx: usize) -> String {
+    let name = crate::config::entry_name(entry);
+    let caption = crate::config::entry_caption(entry);
+    if caption.is_empty() {
+        format!("{}  {}", display_idx + 1, name)
+    } else {
+        format!("{}  {} - {}", display_idx + 1, name, caption)
+    }
+}
+
 fn open_edit(app: &mut KeykoffApp, config_idx: usize) {
     match app.config.entries.get(config_idx) {
         Some(crate::config::Entry::Program(_)) => {
@@ -60,15 +70,7 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
         let font = egui::FontId::proportional(14.0);
         let mut max_w = 0.0_f32;
         for (display_idx, &config_idx) in app.filtered_indices.iter().enumerate().take(9) {
-            let (name, caption): (&str, &str) = match &app.config.entries[config_idx] {
-                crate::config::Entry::Program(p) => (p.name.as_str(), p.caption.as_str()),
-                crate::config::Entry::Group(g) => (g.name.as_str(), g.caption.as_str()),
-            };
-            let text = if caption.is_empty() {
-                format!("{}  {}", display_idx + 1, name)
-            } else {
-                format!("{}  {} - {}", display_idx + 1, name, caption)
-            };
+            let text = row_text(&app.config.entries[config_idx], display_idx);
             let w = f.layout_no_wrap(text, font.clone(), egui::Color32::WHITE).size().x;
             max_w = max_w.max(w);
         }
@@ -103,16 +105,8 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
             for (display_idx, &config_idx) in
                 app.filtered_indices.iter().enumerate().take(9)
             {
-                let (name, caption): (&str, &str) = match &app.config.entries[config_idx] {
-                    crate::config::Entry::Program(p) => (p.name.as_str(), p.caption.as_str()),
-                    crate::config::Entry::Group(g) => (g.name.as_str(), g.caption.as_str()),
-                };
                 let is_selected = display_idx == app.selected_index;
-                let text = if caption.is_empty() {
-                    format!("{}  {}", display_idx + 1, name)
-                } else {
-                    format!("{}  {} - {}", display_idx + 1, name, caption)
-                };
+                let text = row_text(&app.config.entries[config_idx], display_idx);
                 let label = egui::SelectableLabel::new(is_selected, text);
                 let resp = ui.add(label);
                 if resp.clicked() {
@@ -162,12 +156,8 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
         if let Some(&config_idx) = app.filtered_indices.get(app.selected_index) {
             launch_index = Some(config_idx);
         } else if !app.search_text.is_empty() {
+            app.clear_dialog_fields();
             app.dialog_name = app.search_text.clone();
-            app.dialog_caption.clear();
-            app.dialog_executable.clear();
-            app.dialog_parameters.clear();
-            app.dialog_working_directory.clear();
-            app.dialog_error = None;
             app.dialog_return_to_idle = true;
             app.set_mode(AppMode::NewConfig);
             return;

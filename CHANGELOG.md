@@ -4,6 +4,17 @@ All notable changes to keykoff will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Cancelling a dialog that was opened from the input overlay (or from a launch error) no longer causes the *next* dialog opened from the config list to wrongly return to Idle instead of the config list after saving.
+
+### Changed
+
+- A corrupt `config.json` is now backed up to `config.json.bak` before defaults are used, instead of being silently overwritten on the next save.
+- Failure to register the global hotkey at startup (e.g. the binding is owned by another app) no longer crashes the app; the tray menu remains usable so a different binding can be chosen in the Hotkey tab.
+
 ## [1.1.1] - 2026-05-24
 
 ### Fixed

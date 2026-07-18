@@ -117,7 +117,22 @@ pub fn load_config() -> AppConfig {
         return AppConfig::default();
     }
     match std::fs::read_to_string(&path) {
-        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Ok(contents) => match serde_json::from_str(&contents) {
+            Ok(config) => config,
+            Err(e) => {
+                // A parse failure must not silently discard the file: the next
+                // save would overwrite it and lose all entries. Keep a backup.
+                let backup = path.with_extension("json.bak");
+                let _ = std::fs::copy(&path, &backup);
+                eprintln!(
+                    "keykoff: failed to parse {} ({}); backed up to {}",
+                    path.display(),
+                    e,
+                    backup.display()
+                );
+                AppConfig::default()
+            }
+        },
         Err(_) => AppConfig::default(),
     }
 }
@@ -136,6 +151,13 @@ pub fn entry_name(entry: &Entry) -> &str {
     match entry {
         Entry::Program(p) => &p.name,
         Entry::Group(g) => &g.name,
+    }
+}
+
+pub fn entry_caption(entry: &Entry) -> &str {
+    match entry {
+        Entry::Program(p) => &p.caption,
+        Entry::Group(g) => &g.caption,
     }
 }
 
@@ -306,11 +328,6 @@ mod tests {
             caption: String::new(),
             members: members.iter().map(|s| s.to_string()).collect(),
         })
-    }
-
-    #[allow(dead_code)]
-    fn entry_name(e: &Entry) -> &str {
-        super::entry_name(e)
     }
 
     #[test]

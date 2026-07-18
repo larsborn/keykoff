@@ -74,7 +74,7 @@ Mode transitions reconfigure window properties (size, position, decorations) via
 - **Commands tab -> Edit on Group entry** -> open EditGroup dialog (returns to Idle after save)
 - **Group launch** -> walks members depth-first, deduplicates programs, launches each via detached process; missing members are silently skipped; cycles are guarded by visited-set
 
-The `dialog_return_to_idle` flag on `KeykoffApp` tracks whether the config dialog should return to Idle (true) or ConfigList (false) after save.
+The `dialog_return_to_idle` flag on `KeykoffApp` tracks whether the config dialog should return to Idle (true) or ConfigList (false) after save. The `clear_*_dialog_fields` / `populate_*_dialog_from_index` helpers reset it to false; entry points that want return-to-Idle (overlay, launch-error) set it to true *after* calling them, so a Cancel/Escape can never leak a stale flag into a dialog opened later from the config list.
 
 ## Project Structure
 
@@ -96,7 +96,7 @@ src/
 
 ## Data
 
-Configurations are stored as JSON at `%APPDATA%/keykoff/config.json`.
+Configurations are stored as JSON at `%APPDATA%/keykoff/config.json`. If the file exists but fails to parse, it is copied to `config.json.bak` before defaults are used, so a later save can't silently destroy the user's entries.
 
 The `entries` list is polymorphic: each entry has a `kind` field (`program` or `group`) that determines the variant. Backwards compatibility is maintained — entries lacking a `kind` field deserialize as programs.
 
@@ -152,7 +152,7 @@ All fields added after the initial version use `#[serde(default)]` so existing c
 
 ### Hotkey re-registration
 
-The Hotkey tab in ConfigList allows changing the key (F1-F12) and modifiers (ALT, CTRL). On change, `app.reregister_hotkey()` unregisters the old binding and registers the new one via `GlobalHotKeyManager`. At least one modifier is enforced.
+The Hotkey tab in ConfigList allows changing the key (F1-F12) and modifiers (ALT, CTRL). On change, `app.reregister_hotkey()` unregisters the old binding and registers the new one via `GlobalHotKeyManager`. At least one modifier is enforced. Initial registration failure at startup (e.g. another app owns the binding) is non-fatal: the app logs and continues so the tray menu stays usable and the user can pick a different binding.
 
 ### Process spawning
 

@@ -21,18 +21,13 @@ pub enum AppMode {
     ConfigList,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum ConfigTab {
+    #[default]
     Commands,
     Positioning,
     Hotkey,
     Autostart,
-}
-
-impl Default for ConfigTab {
-    fn default() -> Self {
-        Self::Commands
-    }
 }
 
 pub struct KeykoffApp {
@@ -79,6 +74,7 @@ pub struct KeykoffApp {
 
 impl KeykoffApp {
     pub fn new(
+        config: AppConfig,
         tray_icon: TrayIcon,
         tray_state: TrayState,
         hotkey_manager: GlobalHotKeyManager,
@@ -92,7 +88,7 @@ impl KeykoffApp {
             needs_focus: false,
             focus_requested: false,
             quit_requested: false,
-            config: config::load_config(),
+            config,
             search_text: String::new(),
             filtered_indices: Vec::new(),
             selected_index: 0,
@@ -109,7 +105,7 @@ impl KeykoffApp {
             config_tab: ConfigTab::default(),
             _tray_icon: tray_icon,
             tray_state,
-            hotkey_manager: hotkey_manager,
+            hotkey_manager,
             hotkey,
             menu_rx,
             hotkey_rx,
@@ -155,15 +151,11 @@ impl KeykoffApp {
 
     pub fn do_launch(&mut self, config_index: usize) {
         use crate::config::{flatten_group_to_programs, Entry};
-        match self.config.entries.get(config_index) {
-            Some(Entry::Program(_)) => {
-                // Clone the program so we can subsequently call &mut self methods
-                // (e.g. populate_program_dialog_from_index) without a borrow conflict.
-                let program = if let Some(Entry::Program(p)) = self.config.entries.get(config_index) {
-                    p.clone()
-                } else {
-                    return;
-                };
+        // Clone the entry so we can subsequently call &mut self methods
+        // (e.g. populate_program_dialog_from_index) without a borrow conflict.
+        let entry = self.config.entries.get(config_index).cloned();
+        match entry {
+            Some(Entry::Program(program)) => {
                 if let Err(e) = crate::launcher::launch(&program) {
                     self.populate_program_dialog_from_index(config_index);
                     self.dialog_error = Some(e);
@@ -190,6 +182,9 @@ impl KeykoffApp {
         }
     }
 
+    // All four dialog-open helpers reset dialog_return_to_idle so a Cancel/Escape
+    // can't leak a stale `true` into a dialog later opened from the config list.
+    // Callers that want return-to-Idle set the flag *after* calling these.
     pub fn populate_program_dialog_from_index(&mut self, index: usize) {
         if let Some(crate::config::Entry::Program(p)) = self.config.entries.get(index) {
             self.dialog_name = p.name.clone();
@@ -198,6 +193,7 @@ impl KeykoffApp {
             self.dialog_parameters = p.parameters.clone();
             self.dialog_working_directory = p.working_directory.clone();
             self.dialog_error = None;
+            self.dialog_return_to_idle = false;
         }
     }
 
@@ -208,6 +204,7 @@ impl KeykoffApp {
         self.dialog_parameters.clear();
         self.dialog_working_directory.clear();
         self.dialog_error = None;
+        self.dialog_return_to_idle = false;
     }
 
     pub fn clear_group_dialog_fields(&mut self) {
@@ -217,6 +214,7 @@ impl KeykoffApp {
         self.dialog_member_input.clear();
         self.dialog_suggestion_index = 0;
         self.dialog_error = None;
+        self.dialog_return_to_idle = false;
     }
 
     pub fn populate_group_dialog_from_index(&mut self, index: usize) {
@@ -227,6 +225,7 @@ impl KeykoffApp {
             self.dialog_member_input.clear();
             self.dialog_suggestion_index = 0;
             self.dialog_error = None;
+            self.dialog_return_to_idle = false;
         }
     }
 
@@ -240,67 +239,22 @@ impl KeykoffApp {
             return false;
         }
 
-        let trimmed_name = self.dialog_name.trim().to_string();
-
-        // Uniqueness check: name must not collide with any other entry.
-        let collides = self
-            .config
-            .entries
-            .iter()
-            .enumerate()
-            .any(|(i, e)| {
-                let name = crate::config::entry_name(e);
-                let is_self = matches!(self.mode, AppMode::EditConfig { index } if index == i);
-                !is_self && name == trimmed_name
-            });
-        if collides {
-            self.dialog_error = Some("Name already used by another entry.".into());
-            return false;
-        }
-
-        let prev_name: Option<String> = match self.mode {
-            AppMode::EditConfig { index } => match self.config.entries.get(index) {
-                Some(crate::config::Entry::Program(p)) => Some(p.name.clone()),
-                _ => None,
-            },
-            _ => None,
-        };
-
         let program = RunConfig {
-            name: trimmed_name.clone(),
+            name: self.dialog_name.trim().to_string(),
             caption: self.dialog_caption.trim().to_string(),
             executable: self.dialog_executable.trim().trim_matches('"').to_string(),
             parameters: self.dialog_parameters.trim().to_string(),
             working_directory: self.dialog_working_directory.trim().to_string(),
         };
-
-        match self.mode {
-            AppMode::NewConfig => self
-                .config
-                .entries
-                .push(crate::config::Entry::Program(program)),
-            AppMode::EditConfig { index } => {
-                self.config.entries[index] = crate::config::Entry::Program(program);
-            }
-            _ => {}
-        }
-
-        if let Some(prev) = prev_name {
-            if prev != trimmed_name {
-                crate::config::cascade_rename(&mut self.config.entries, &prev, &trimmed_name);
-            }
-        }
-
-        if let Err(e) = config::save_config(&self.config) {
-            self.dialog_error = Some(format!("Failed to save: {}", e));
-            return false;
-        }
-        true
+        let edit_index = match self.mode {
+            AppMode::EditConfig { index } => Some(index),
+            _ => None,
+        };
+        self.commit_entry(crate::config::Entry::Program(program), edit_index)
     }
 
     pub fn save_group_dialog(&mut self) -> bool {
-        let trimmed_name = self.dialog_name.trim().to_string();
-        if trimmed_name.is_empty() {
+        if self.dialog_name.trim().is_empty() {
             self.dialog_error = Some("Name is required.".into());
             return false;
         }
@@ -309,52 +263,46 @@ impl KeykoffApp {
             return false;
         }
 
-        // Determine the previous name (for cascade-rename when editing).
-        let prev_name: Option<String> = match self.mode {
-            AppMode::EditGroup { index } => match self.config.entries.get(index) {
-                Some(crate::config::Entry::Group(g)) => Some(g.name.clone()),
-                _ => None,
-            },
+        let group = crate::config::RunGroup {
+            name: self.dialog_name.trim().to_string(),
+            caption: self.dialog_caption.trim().to_string(),
+            members: self.dialog_members.clone(),
+        };
+        let edit_index = match self.mode {
+            AppMode::EditGroup { index } => Some(index),
             _ => None,
         };
+        self.commit_entry(crate::config::Entry::Group(group), edit_index)
+    }
 
-        // Uniqueness: name must not collide with any other entry.
+    /// Shared tail of both dialog saves: uniqueness check, insert/replace,
+    /// cascade-rename of group member references, and persist to disk.
+    /// On failure, sets `dialog_error` and returns false.
+    fn commit_entry(&mut self, entry: crate::config::Entry, edit_index: Option<usize>) -> bool {
+        let new_name = crate::config::entry_name(&entry).to_string();
+
         let collides = self
             .config
             .entries
             .iter()
             .enumerate()
-            .any(|(i, e)| {
-                let name = crate::config::entry_name(e);
-                let is_self = matches!(self.mode, AppMode::EditGroup { index } if index == i);
-                !is_self && name == trimmed_name
-            });
+            .any(|(i, e)| edit_index != Some(i) && crate::config::entry_name(e) == new_name);
         if collides {
             self.dialog_error = Some("Name already used by another entry.".into());
             return false;
         }
 
-        let group = crate::config::RunGroup {
-            name: trimmed_name.clone(),
-            caption: self.dialog_caption.trim().to_string(),
-            members: self.dialog_members.clone(),
-        };
+        let prev_name = edit_index
+            .and_then(|i| self.config.entries.get(i))
+            .map(|e| crate::config::entry_name(e).to_string());
 
-        match self.mode {
-            AppMode::NewGroup => self
-                .config
-                .entries
-                .push(crate::config::Entry::Group(group)),
-            AppMode::EditGroup { index } => {
-                self.config.entries[index] = crate::config::Entry::Group(group);
-            }
-            _ => {}
+        match edit_index {
+            Some(index) => self.config.entries[index] = entry,
+            None => self.config.entries.push(entry),
         }
 
         if let Some(prev) = prev_name {
-            if prev != trimmed_name {
-                crate::config::cascade_rename(&mut self.config.entries, &prev, &trimmed_name);
-            }
+            crate::config::cascade_rename(&mut self.config.entries, &prev, &new_name);
         }
 
         if let Err(e) = config::save_config(&self.config) {

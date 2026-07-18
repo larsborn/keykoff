@@ -223,11 +223,7 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
         app.set_mode(AppMode::Idle);
         return;
     }
-    if save_clicked {
-        let return_to_idle = app.dialog_return_to_idle;
-        if app.save_group_dialog() {
-            app.dialog_return_to_idle = false;
-            app.set_mode(if return_to_idle { AppMode::Idle } else { AppMode::ConfigList });
-        }
+    if save_clicked && app.save_group_dialog() {
+        app.set_mode(if app.dialog_return_to_idle { AppMode::Idle } else { AppMode::ConfigList });
     }
 }

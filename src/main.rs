@@ -45,6 +45,7 @@ fn main() -> eframe::Result<()> {
             }));
 
             Ok(Box::new(app::KeykoffApp::new(
+                loaded_config,
                 tray_icon,
                 tray_state,
                 hotkey_manager,
