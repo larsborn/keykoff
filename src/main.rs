@@ -2,6 +2,7 @@
 
 mod app;
 mod config;
+mod focus;
 mod hotkey;
 mod launcher;
 mod tray;

@@ -25,6 +25,7 @@ Release builds hide the console window via `#![windows_subsystem = "windows"]`.
 | global-hotkey | 0.6 | Configurable hotkey registration |
 | serde / serde_json | 1 | Config serialization |
 | dirs | 6 | `%APPDATA%` path resolution |
+| raw-window-handle | 0.6 | HWND access for Win32 foreground forcing |
 | rfd | 0.15 | Native file/folder picker dialogs |
 | winreg | 0.55 | Windows registry access (autostart) |
 
@@ -46,6 +47,7 @@ Mode transitions reconfigure window properties (size, position, decorations) via
 - **`set_event_handler` steals from `receiver()`** — after calling `set_event_handler` on `MenuEvent` or `GlobalHotKeyEvent`, the built-in `receiver()` stops receiving events. Events must be forwarded through `mpsc` channels from the handler callbacks.
 - **Hotkey fires on both Pressed and Released** — filter for `HotKeyState::Pressed` only to prevent instant toggle-back.
 - **`.with_taskbar(false)`** on `ViewportBuilder` hides the app from the Windows taskbar (tray-only).
+- **`SetForegroundWindow` is denied to background processes** — `ViewportCommand::Focus` silently fails when another process holds the foreground lock (e.g. the Start menu is open when the hotkey fires), leaving keystrokes in the old window. `focus::force_foreground()` applies the standard launcher workaround (simulated ALT keypress + `AttachThreadInput`, then direct `SetForegroundWindow`) and is called whenever the overlay is summoned or re-focused.
 
 ### Event handling
 
@@ -83,6 +85,7 @@ src/
   main.rs              # Entry point, eframe launch, tray + hotkey wiring, mpsc channels
   app.rs               # AppMode/ConfigTab enums, KeykoffApp struct, eframe::App impl
   config.rs            # RunConfig/AppConfig structs, JSON load/save
+  focus.rs             # Win32 foreground forcing (Start-menu-open case)
   tray.rs              # Tray icon + menu creation (RGBA bytes, no asset files)
   hotkey.rs            # Hotkey registration, key/modifier mapping (F1-F12), re-registration
   launcher.rs          # Process spawning (detached on Windows)

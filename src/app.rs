@@ -318,7 +318,7 @@ impl KeykoffApp {
         let _ = self.hotkey_manager.register(self.hotkey);
     }
 
-    fn apply_mode_viewport_commands(&mut self, ctx: &egui::Context) {
+    fn apply_mode_viewport_commands(&mut self, ctx: &egui::Context, frame: &eframe::Frame) {
         if !self.mode_changed {
             return;
         }
@@ -347,6 +347,10 @@ impl KeykoffApp {
                     egui::WindowLevel::AlwaysOnTop,
                 ));
                 ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+                // Focus alone is denied when another process (e.g. the open
+                // Start menu) holds the Windows foreground lock — keystrokes
+                // would keep going to that window instead of the overlay.
+                crate::focus::force_foreground(frame);
             }
             AppMode::NewConfig | AppMode::EditConfig { .. }
             | AppMode::NewGroup | AppMode::EditGroup { .. } => {
@@ -406,13 +410,14 @@ impl KeykoffApp {
 }
 
 impl eframe::App for KeykoffApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.apply_mode_viewport_commands(ctx);
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        self.apply_mode_viewport_commands(ctx, frame);
         self.handle_events();
 
         if self.focus_requested {
             self.focus_requested = false;
             ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            crate::focus::force_foreground(frame);
         }
 
         // Intercept window close: hide instead of quit, unless quit was requested
