@@ -17,7 +17,11 @@
 #[cfg(target_os = "windows")]
 mod win {
     pub const VK_ESCAPE: u8 = 0x1B;
+    pub const VK_SHIFT: u8 = 0x10;
+    pub const VK_CONTROL: u8 = 0x11;
     pub const VK_MENU: u8 = 0x12;
+    pub const VK_LWIN: u8 = 0x5B;
+    pub const VK_RWIN: u8 = 0x5C;
     pub const KEYEVENTF_KEYUP: u32 = 0x0002;
     pub const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
 
@@ -30,6 +34,7 @@ mod win {
         pub fn AttachThreadInput(id_attach: u32, id_attach_to: u32, attach: i32) -> i32;
         pub fn GetWindowThreadProcessId(hwnd: isize, pid: *mut u32) -> u32;
         pub fn keybd_event(vk: u8, scan: u8, flags: u32, extra_info: usize);
+        pub fn GetAsyncKeyState(vk: i32) -> i16;
     }
     #[link(name = "kernel32")]
     extern "system" {
@@ -47,6 +52,20 @@ mod win {
     pub unsafe fn tap_key(vk: u8) {
         keybd_event(vk, 0, 0, 0);
         keybd_event(vk, 0, KEYEVENTF_KEYUP, 0);
+    }
+
+    /// Inject key-ups for any physically held modifiers. The hotkey that
+    /// summoned us is still being held (e.g. CTRL of CTRL+F10), so without
+    /// this the taps below become chords: CTRL+ALT doesn't release the
+    /// foreground lock, and CTRL+ESC *toggles the Start menu* instead of
+    /// dismissing it. The user's later physical release just produces a
+    /// redundant key-up, which is harmless.
+    pub unsafe fn release_held_modifiers() {
+        for vk in [VK_CONTROL, VK_SHIFT, VK_MENU, VK_LWIN, VK_RWIN] {
+            if GetAsyncKeyState(vk as i32) as u16 & 0x8000 != 0 {
+                keybd_event(vk, 0, KEYEVENTF_KEYUP, 0);
+            }
+        }
     }
 
     /// True if `hwnd` belongs to one of the shell flyout hosts (Start menu,
@@ -98,6 +117,8 @@ pub fn force_foreground(frame: &eframe::Frame) {
         if foreground == hwnd {
             return;
         }
+
+        release_held_modifiers();
 
         // Dismiss an open shell flyout; it swallows keystrokes and refuses to
         // yield the foreground lock even to the tricks below.
