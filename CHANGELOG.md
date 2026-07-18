@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Opening the overlay while another process holds the Windows foreground lock (e.g. the Start menu is open) now actually moves keyboard focus to the input box instead of leaving keystrokes in the previous window. Uses the standard launcher workaround: simulated ALT keypress plus `AttachThreadInput`, then a direct `SetForegroundWindow`.
+- Opening the overlay while another process holds the Windows foreground lock (e.g. the Start menu is open) now actually moves keyboard focus to the input box instead of leaving keystrokes in the previous window. Open shell flyouts (Start menu, Search, Action Center) are dismissed with a simulated ESC, then the overlay takes the foreground via the standard launcher tricks (ALT tap + `AttachThreadInput` + direct `SetForegroundWindow`, verified and retried).
 - Cancelling a dialog that was opened from the input overlay (or from a launch error) no longer causes the *next* dialog opened from the config list to wrongly return to Idle instead of the config list after saving.
 
 ### Changed

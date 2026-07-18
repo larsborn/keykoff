@@ -47,7 +47,7 @@ Mode transitions reconfigure window properties (size, position, decorations) via
 - **`set_event_handler` steals from `receiver()`** — after calling `set_event_handler` on `MenuEvent` or `GlobalHotKeyEvent`, the built-in `receiver()` stops receiving events. Events must be forwarded through `mpsc` channels from the handler callbacks.
 - **Hotkey fires on both Pressed and Released** — filter for `HotKeyState::Pressed` only to prevent instant toggle-back.
 - **`.with_taskbar(false)`** on `ViewportBuilder` hides the app from the Windows taskbar (tray-only).
-- **`SetForegroundWindow` is denied to background processes** — `ViewportCommand::Focus` silently fails when another process holds the foreground lock (e.g. the Start menu is open when the hotkey fires), leaving keystrokes in the old window. `focus::force_foreground()` applies the standard launcher workaround (simulated ALT keypress + `AttachThreadInput`, then direct `SetForegroundWindow`) and is called whenever the overlay is summoned or re-focused.
+- **`SetForegroundWindow` is denied to background processes** — `ViewportCommand::Focus` silently fails when another process holds the foreground lock (e.g. the Start menu is open when the hotkey fires), leaving keystrokes in the old window. `focus::force_foreground()` layers the standard launcher workarounds: dismiss shell flyouts (Start/Search/Action Center, detected by foreground process image name) with a simulated ESC, then ALT tap + `AttachThreadInput` + direct `SetForegroundWindow`, verified via `GetForegroundWindow` and retried. Called whenever the overlay is summoned or re-focused. `handle_events()` must run *before* `apply_mode_viewport_commands()` in `update()` so this happens in the same frame as the hotkey event.
 
 ### Event handling
 

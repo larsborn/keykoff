@@ -411,8 +411,12 @@ impl KeykoffApp {
 
 impl eframe::App for KeykoffApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        self.apply_mode_viewport_commands(ctx, frame);
+        // Drain events before applying viewport commands so a hotkey-triggered
+        // mode change takes effect in this same frame: the foreground-forcing
+        // in apply_mode_viewport_commands works best while the user's hotkey
+        // input is fresh (Windows' foreground-lock heuristics are time-based).
         self.handle_events();
+        self.apply_mode_viewport_commands(ctx, frame);
 
         if self.focus_requested {
             self.focus_requested = false;
