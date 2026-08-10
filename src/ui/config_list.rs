@@ -127,12 +127,7 @@ fn show_commands_tab(app: &mut KeykoffApp, ui: &mut egui::Ui) {
             None => {}
         },
         Some(ListAction::Delete(i)) => {
-            let deleted_name = app.config.entries.get(i).map(|e| crate::config::entry_name(e).to_string());
-            app.config.entries.remove(i);
-            if let Some(name) = deleted_name {
-                crate::config::cascade_delete(&mut app.config.entries, &name);
-            }
-            let _ = config::save_config(&app.config);
+            app.delete_entry(i);
         }
         None => {}
     }

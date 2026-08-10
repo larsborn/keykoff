@@ -312,6 +312,22 @@ impl KeykoffApp {
         true
     }
 
+    /// Remove the entry at `index`, cascade-remove references to it from
+    /// groups, and persist the config.
+    pub fn delete_entry(&mut self, index: usize) {
+        let deleted_name = self
+            .config
+            .entries
+            .get(index)
+            .map(|e| crate::config::entry_name(e).to_string());
+        let Some(name) = deleted_name else {
+            return;
+        };
+        self.config.entries.remove(index);
+        crate::config::cascade_delete(&mut self.config.entries, &name);
+        let _ = config::save_config(&self.config);
+    }
+
     pub fn reregister_hotkey(&mut self) {
         let _ = self.hotkey_manager.unregister(self.hotkey);
         self.hotkey = crate::hotkey::hotkey_from_config(&self.config);

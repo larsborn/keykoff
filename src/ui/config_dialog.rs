@@ -12,6 +12,7 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
 
     let mut save_requested = false;
     let mut cancel_requested = false;
+    let mut delete_requested = false;
 
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.heading(title);
@@ -132,6 +133,12 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
                 if ui.button("  Save  ").clicked() {
                     save_requested = true;
                 }
+                if is_edit {
+                    ui.add_space(10.0);
+                    if ui.button("Delete").clicked() {
+                        delete_requested = true;
+                    }
+                }
             });
         });
     });
@@ -143,6 +150,17 @@ pub fn show(app: &mut KeykoffApp, ctx: &egui::Context) {
         save_requested = true;
     }
 
+    if delete_requested {
+        if let AppMode::EditConfig { index } = app.mode {
+            app.delete_entry(index);
+            app.set_mode(if app.dialog_return_to_idle {
+                AppMode::Idle
+            } else {
+                AppMode::ConfigList
+            });
+        }
+        return;
+    }
     if cancel_requested {
         app.set_mode(AppMode::Idle);
         return;
