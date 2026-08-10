@@ -12,9 +12,18 @@ keykoff — A Windows quick-launcher that lives in the system tray. Global hotke
 cargo build          # debug build
 cargo build --release
 cargo run            # runs debug build (console visible)
+cargo test           # unit tests (all live in src/config.rs)
+cargo test would_cycle   # run tests matching a name substring
 ```
 
 Release builds hide the console window via `#![windows_subsystem = "windows"]`.
+
+Unit tests cover config serialization back-compat (`kind` field), cascade rename/delete, and cycle detection. UI/Win32 code is untested — verify by running the app.
+
+## Release process
+
+1. Bump `version` in `Cargo.toml`, update `CHANGELOG.md` (see Changelog section), commit.
+2. Tag `vX.Y.Z` and push the tag — `.github/workflows/release.yml` builds `keykoff.exe` on `windows-latest` and creates a GitHub release with auto-generated notes.
 
 ## Tech Stack
 
@@ -28,6 +37,7 @@ Release builds hide the console window via `#![windows_subsystem = "windows"]`.
 | raw-window-handle | 0.6 | HWND access for Win32 foreground forcing |
 | rfd | 0.15 | Native file/folder picker dialogs |
 | winreg | 0.55 | Windows registry access (autostart) |
+| winresource | 0.1 | (build dep) embeds VERSIONINFO + icon into the exe |
 
 ## Architecture
 
@@ -71,6 +81,7 @@ Mode transitions reconfigure window properties (size, position, decorations) via
 - **Launch failure** -> open EditConfig with error message (returns to Idle after save)
 - **Config dialog -> Save (or Enter in any field)** -> returns to Idle if opened from overlay/launch-error, ConfigList if opened from config list
 - **Config dialog -> Cancel or Escape** -> returns to Idle
+- **Edit dialog (program or group) -> Delete** -> removes the entry (with cascade delete from groups), returns to Idle or ConfigList following the same rule as Save; button only shown in edit mode
 - **Config list -> opened from tray** -> Escape returns to Idle
 - **Commands tab -> "+ New Group" button** -> open NewGroup dialog (returns to Idle after save)
 - **Commands tab -> Edit on Group entry** -> open EditGroup dialog (returns to Idle after save)
@@ -81,6 +92,8 @@ The `dialog_return_to_idle` flag on `KeykoffApp` tracks whether the config dialo
 ## Project Structure
 
 ```
+build.rs               # Embeds Windows VERSIONINFO + icon (winresource)
+assets/keykoff.ico     # Application icon compiled into the exe
 src/
   main.rs              # Entry point, eframe launch, tray + hotkey wiring, mpsc channels
   app.rs               # AppMode/ConfigTab enums, KeykoffApp struct, eframe::App impl
@@ -96,6 +109,8 @@ src/
     config_list.rs     # Tabbed settings: Commands list, Positioning tab, Hotkey tab, Autostart tab
     group_dialog.rs    # New/edit execution group form (name, caption, type-to-add member list)
 ```
+
+Design docs and implementation plans for past features live in `docs/superpowers/` (specs + plans, e.g. execution groups).
 
 ## Data
 
@@ -180,7 +195,7 @@ When a program or group is renamed or deleted, all groups that reference it are 
 ## Conventions
 
 - Rust 2021 edition
-- No external build scripts or asset files — tray icon is generated from RGBA bytes at runtime
+- Tray icon is generated from RGBA bytes at runtime (no asset file). The *executable's* icon and VERSIONINFO resource are embedded at build time by `build.rs` (winresource) from `assets/keykoff.ico` and `Cargo.toml` metadata — added to reduce antivirus false positives (unsigned + metadata-less binaries score worse with Defender ML heuristics)
 - Launched processes are fully detached so they outlive keykoff
 - Window close button (X) hides to tray; only "Quit" from the tray menu actually exits
 - egui's default font lacks many Unicode symbols — use ASCII alternatives (e.g. `->` not arrow characters)
