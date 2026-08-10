@@ -4,6 +4,13 @@ All notable changes to keykoff will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-08-09
+
+### Added
+
+- The executable now carries a Windows version resource (product name, description, version, copyright) and an embedded application icon. Metadata-less unsigned binaries score badly with antivirus ML heuristics; this reduces false positives like `Behavior:Win32/Persistence.A!ml`.
+- Delete button in the Edit Configuration and Edit Group dialogs, left of Save. Removes the entry (including cascade removal from any groups that reference it) and returns to wherever Save would have gone. Only shown when editing an existing entry, not when creating a new one.
+
 ## [1.1.2] - 2026-07-18
 
 ### Fixed
