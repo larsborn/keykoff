@@ -4,6 +4,13 @@ All notable changes to keykoff will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.1] - 2026-08-12
+
+### Changed
+
+- The overlay no longer synthesizes keystrokes on every summon. Taking the foreground is now attempted with a plain `SetForegroundWindow` first, and the ALT-tap/`AttachThreadInput` workaround only runs when that is denied (e.g. the Start menu holds the foreground lock). Injecting input on every hotkey press is a behaviour antivirus heuristics score against; this removes it from the common case.
+- Replaced the superseded `keybd_event` API with `SendInput`, which also delivers each key sequence atomically so nothing can interleave between keydown and keyup.
+
 ## [1.2.0] - 2026-08-09
 
 ### Added
