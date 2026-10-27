@@ -4,6 +4,12 @@ All notable changes to keykoff will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Console programs (a terminal file manager, a shell, anything built for a console) exited immediately when launched: every child was started detached, so a console-subsystem executable had no console and no standard handles. The launcher now reads the executable's PE header and gives console programs a console window of their own (`CREATE_NEW_CONSOLE`); GUI programs are started detached as before.
+
 ## [1.2.1] - 2026-08-12
 
 ### Changed
